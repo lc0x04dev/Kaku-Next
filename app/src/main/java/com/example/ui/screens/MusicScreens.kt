@@ -2,12 +2,15 @@ package com.example.ui.screens
 
 import android.os.Build
 import android.widget.Toast
+import kotlinx.coroutines.launch
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -427,6 +430,8 @@ fun PlayerScreen(
 
     val song = currentSong!!
     val accentColor = Color(song.coverColor)
+    val pagerState = rememberPagerState(pageCount = { 2 })
+    val coroutineScope = rememberCoroutineScope()
 
     Column(
         modifier = modifier
@@ -437,74 +442,216 @@ fun PlayerScreen(
     ) {
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Screen Header
-        Text(
-            text = "REPRODUCIENDO",
-            style = MaterialTheme.typography.labelMedium.copy(
-                letterSpacing = 2.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextGray
-            ),
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-
-        // Atmospheric glowing vinyl/album art cover (Immersive design spec)
-        Box(
+        // Segmented selector for Cover/Lyrics View
+        Row(
             modifier = Modifier
-                .size(240.dp)
+                .padding(bottom = 12.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(ContainerDark)
                 .padding(4.dp),
-            contentAlignment = Alignment.Center
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Glow backdrop aura
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(
-                                NeonCyan.copy(alpha = 0.15f),
-                                Color.Transparent,
-                                NeonMagenta.copy(alpha = 0.15f)
-                            )
-                        )
-                    )
-            )
-
-            // Main outer core
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(8.dp)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(SurfaceDark)
-                    .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(24.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                // Inner card disc frame
+            val options = listOf("Portada", "Letra")
+            options.forEachIndexed { index, title ->
+                val selected = pagerState.currentPage == index
                 Box(
                     modifier = Modifier
-                        .size(150.dp)
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(Color(0xFF1C1C1C), Color(0xFF0C0C0C))
-                            )
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(if (selected) NeonCyan.copy(alpha = 0.15f) else Color.Transparent)
+                        .border(
+                            width = 1.dp,
+                            color = if (selected) NeonCyan.copy(alpha = 0.3f) else Color.Transparent,
+                            shape = RoundedCornerShape(16.dp)
                         )
-                        .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(20.dp)),
+                        .clickable {
+                            coroutineScope.launch {
+                                pagerState.animateScrollToPage(index)
+                            }
+                        }
+                        .padding(horizontal = 20.dp, vertical = 6.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.MusicNote,
-                        contentDescription = "Music Note",
-                        tint = accentColor.copy(alpha = 0.5f),
-                        modifier = Modifier.size(64.dp)
+                    Text(
+                        text = title,
+                        color = if (selected) NeonCyan else TextGray,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
                     )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(18.dp))
+        // Horizontal Pager container
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .testTag("player_pager")
+        ) { page ->
+            if (page == 0) {
+                // Page 0: Cover artwork/image
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    // Atmospheric glowing vinyl/album art cover (Immersive design spec)
+                    Box(
+                        modifier = Modifier
+                            .size(240.dp)
+                            .padding(4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        // Glow backdrop aura
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(24.dp))
+                                .background(
+                                    Brush.linearGradient(
+                                        colors = listOf(
+                                            NeonCyan.copy(alpha = 0.15f),
+                                            Color.Transparent,
+                                            NeonMagenta.copy(alpha = 0.15f)
+                                        )
+                                    )
+                                )
+                        )
+
+                        // Main outer core
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(8.dp)
+                                .clip(RoundedCornerShape(24.dp))
+                                .background(SurfaceDark)
+                                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(24.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            // Inner card disc frame
+                            Box(
+                                modifier = Modifier
+                                    .size(150.dp)
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(
+                                        Brush.linearGradient(
+                                            colors = listOf(Color(0xFF1C1C1C), Color(0xFF0C0C0C))
+                                        )
+                                    )
+                                    .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(20.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.MusicNote,
+                                    contentDescription = "Music Note",
+                                    tint = accentColor.copy(alpha = 0.5f),
+                                    modifier = Modifier.size(64.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Page 1: Lyrics list Box
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(bottom = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    // LYRICS CONTAINER (Verified Lyrics box with absolute minimum borders)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(CardDark) // bg-[#0C0C0C]
+                            .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(24.dp)) // border border-white/5
+                            .padding(20.dp)
+                            .testTag("lyrics_container")
+                    ) {
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Lyrics Verified",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Black,
+                                    letterSpacing = 2.sp,
+                                    color = NeonCyan
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = "Verified Icon",
+                                    tint = NeonCyan,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+
+                            if (!song.lyrics.isNullOrBlank()) {
+                                LazyColumn(
+                                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    items(song.lyrics.split("\n")) { line ->
+                                        val lineClean = line.trim()
+                                        if (lineClean.isNotEmpty()) {
+                                            // Match line containing '[' or ']' or styled specially
+                                            val isHighlighted = lineClean.contains("[") || lineClean.contains("]") || lineClean.contains("código") || lineClean.contains("silencio")
+                                            Text(
+                                                text = lineClean.replace("[", "").replace("]", ""),
+                                                color = if (isHighlighted) Color.White else TextGray,
+                                                fontSize = if (isHighlighted) 17.sp else 14.sp,
+                                                fontWeight = if (isHighlighted) FontWeight.Bold else FontWeight.Medium,
+                                                textAlign = TextAlign.Center,
+                                                lineHeight = if (isHighlighted) 22.sp else 19.sp,
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                        }
+                                    }
+                                }
+                            } else {
+                                Box(
+                                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.SearchOff,
+                                            contentDescription = "Sin Letra",
+                                            tint = TextMuted,
+                                            modifier = Modifier.size(40.dp)
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            text = "No hay letra disponible para esta canción.",
+                                            color = TextGray,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier.padding(horizontal = 16.dp).testTag("no_lyrics_message")
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
 
         // Title and Artist Info (aligned left / start as per mock-up)
         Column(
@@ -526,93 +673,6 @@ fun PlayerScreen(
                 fontWeight = FontWeight.Medium,
                 color = NeonLavender.copy(alpha = 0.8f) // matching text-[#E0B0FF] opacity-80
             )
-        }
-
-        Spacer(modifier = Modifier.height(18.dp))
-
-        // LYRICS CONTAINER (Verified Lyrics box with absolute minimum borders)
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .clip(RoundedCornerShape(24.dp))
-                .background(CardDark) // bg-[#0C0C0C]
-                .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(24.dp)) // border border-white/5
-                .padding(20.dp)
-                .testTag("lyrics_container")
-        ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Lyrics Verified",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 2.sp,
-                        color = NeonCyan
-                    )
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = "Verified Icon",
-                        tint = NeonCyan,
-                        modifier = Modifier.size(14.dp)
-                    )
-                }
-
-                if (!song.lyrics.isNullOrBlank()) {
-                    LazyColumn(
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        items(song.lyrics.split("\n")) { line ->
-                            val lineClean = line.trim()
-                            if (lineClean.isNotEmpty()) {
-                                // Match line containing '[' or ']' or styled specially
-                                val isHighlighted = lineClean.contains("[") || lineClean.contains("]") || lineClean.contains("código") || lineClean.contains("silencio")
-                                Text(
-                                    text = lineClean.replace("[", "").replace("]", ""),
-                                    color = if (isHighlighted) Color.White else TextGray,
-                                    fontSize = if (isHighlighted) 17.sp else 14.sp,
-                                    fontWeight = if (isHighlighted) FontWeight.Bold else FontWeight.Medium,
-                                    textAlign = TextAlign.Center,
-                                    lineHeight = if (isHighlighted) 22.sp else 19.sp,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
-                        }
-                    }
-                } else {
-                    Box(
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.SearchOff,
-                                contentDescription = "Sin Letra",
-                                tint = TextMuted,
-                                modifier = Modifier.size(40.dp)
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "No hay letra disponible para esta canción.",
-                                color = TextGray,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.padding(horizontal = 16.dp).testTag("no_lyrics_message")
-                            )
-                        }
-                    }
-                }
-            }
         }
 
         Spacer(modifier = Modifier.height(18.dp))
