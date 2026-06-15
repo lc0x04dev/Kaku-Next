@@ -247,27 +247,61 @@ fun HomeScreen(
         }
 
         // Section Title: Quick Play
-        item {
-            Text(
-                text = "Pistas Populares",
-                style = MaterialTheme.typography.titleMedium,
-                color = NeonMagenta,
-                fontWeight = FontWeight.ExtraBold,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-        }
+        if (songs.isNotEmpty()) {
+            item {
+                Text(
+                    text = "Pistas Populares",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = NeonMagenta,
+                    fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+            }
 
-        // Song list content
-        items(songs) { song ->
-            val isActive = currentSong?.id == song.id
-            SongRowItem(
-                song = song,
-                isActive = isActive,
-                isPlaying = isPlaying && isActive,
-                onClick = { onSongSelected(song) },
-                onFavoriteToggle = { viewModel.toggleFavorite(song.id) }
-            )
-            Spacer(modifier = Modifier.height(8.dp))
+            // Song list content
+            items(songs) { song ->
+                val isActive = currentSong?.id == song.id
+                SongRowItem(
+                    song = song,
+                    isActive = isActive,
+                    isPlaying = isPlaying && isActive,
+                    onClick = { onSongSelected(song) },
+                    onFavoriteToggle = { viewModel.toggleFavorite(song.id) }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        } else {
+            item {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 40.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MusicNote,
+                        contentDescription = "Sin música",
+                        tint = TextMuted,
+                        modifier = Modifier.size(56.dp)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Tu biblioteca está vacía",
+                        color = TextWhite,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Las canciones escaneadas en tu dispositivo se mostrarán aquí.",
+                        color = TextGray,
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
+            }
         }
     }
 }
@@ -874,67 +908,102 @@ fun PlaylistsScreen(
                     )
                 }
 
-                items(playlists) { item ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 12.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(CardDark)
-                            .clickable { selectedPlaylist = item }
-                            .padding(16.dp)
-                            .testTag("playlist_item_${item.id}")
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
+                if (playlists.isEmpty()) {
+                    item {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 60.dp)
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(56.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(
-                                        Brush.linearGradient(
-                                            colors = listOf(NeonMagenta, NeonLavender)
-                                        )
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.QueueMusic,
-                                    contentDescription = null,
-                                    tint = DeepDark,
-                                    modifier = Modifier.size(28.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = item.name,
-                                    color = TextWhite,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp
-                                )
-                                Text(
-                                    text = item.description,
-                                    color = TextGray,
-                                    fontSize = 12.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = "${item.songs.size} pistas",
-                                    color = NeonCyan,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(top = 4.dp)
-                                )
-                            }
                             Icon(
-                                imageVector = Icons.Default.ChevronRight,
-                                contentDescription = "Ver lista",
-                                tint = TextMuted
+                                imageVector = Icons.Default.QueueMusic,
+                                contentDescription = "Sin listas",
+                                tint = TextGray,
+                                modifier = Modifier.size(64.dp)
                             )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Sin listas de reproducción",
+                                color = TextWhite,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Permite acceso a tus archivos de audio locales para sincronizar y comenzar.",
+                                color = TextGray,
+                                fontSize = 13.sp,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(horizontal = 24.dp)
+                            )
+                        }
+                    }
+                } else {
+                    items(playlists) { item ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(CardDark)
+                                .clickable { selectedPlaylist = item }
+                                .padding(16.dp)
+                                .testTag("playlist_item_${item.id}")
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(56.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(
+                                            Brush.linearGradient(
+                                                colors = listOf(NeonMagenta, NeonLavender)
+                                            )
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.QueueMusic,
+                                        contentDescription = null,
+                                        tint = DeepDark,
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = item.name,
+                                        color = TextWhite,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 16.sp
+                                    )
+                                    Text(
+                                        text = item.description,
+                                        color = TextGray,
+                                        fontSize = 12.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = "${item.songs.size} pistas",
+                                        color = NeonCyan,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(top = 4.dp)
+                                    )
+                                }
+                                Icon(
+                                    imageVector = Icons.Default.ChevronRight,
+                                    contentDescription = "Ver lista",
+                                    tint = TextMuted
+                                )
+                            }
                         }
                     }
                 }
@@ -1144,24 +1213,41 @@ fun SearchScreen(
                 ) {
                     Icon(
                         imageVector = Icons.Default.SearchOff,
-                        contentDescription = "No se encontraron resultados",
+                        contentDescription = "Sin resultados",
                         tint = TextMuted,
                         modifier = Modifier.size(64.dp)
                     )
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "Sin pistas para \"$searchQuery\"",
-                        color = TextWhite,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Prueba buscando 'Horizon', 'Retro' o 'Digital'",
-                        color = TextGray,
-                        fontSize = 13.sp,
-                        textAlign = TextAlign.Center
-                    )
+                    if (songs.isEmpty()) {
+                        Text(
+                            text = "Biblioteca sin sincronizar",
+                            color = TextWhite,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Concede acceso al almacenamiento para sincronizar y reproducir tus canciones.",
+                            color = TextGray,
+                            fontSize = 13.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 24.dp)
+                        )
+                    } else {
+                        Text(
+                            text = "Sin pistas para \"$searchQuery\"",
+                            color = TextWhite,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Prueba con un término o palabra clave diferente.",
+                            color = TextGray,
+                            fontSize = 13.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
         } else {
