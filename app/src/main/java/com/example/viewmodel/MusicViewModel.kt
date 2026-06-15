@@ -1,5 +1,8 @@
 package com.example.viewmodel
 
+import android.content.Context
+import android.provider.MediaStore
+import android.media.MediaPlayer
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.model.Song
@@ -152,10 +155,15 @@ class MusicViewModel : ViewModel() {
     private val _hasStoragePermission = MutableStateFlow<Boolean?>(null) // null = not decided, true = granted, false = denied
     val hasStoragePermission: StateFlow<Boolean?> = _hasStoragePermission.asStateFlow()
 
+    // Sync banner visibility state - Hide once local music is scanned and found!
+    private val _showSyncBanner = MutableStateFlow(true)
+    val showSyncBanner: StateFlow<Boolean> = _showSyncBanner.asStateFlow()
+
     private var playbackJob: Job? = null
+    private var mediaPlayer: MediaPlayer? = null
 
     init {
-        // Observe playback state to run active mock audio playback
+        // Observe playback state to run active mock or real audio playback
         viewModelScope.launch {
             _isPlaying.collect { play ->
                 if (play) {
@@ -173,11 +181,20 @@ class MusicViewModel : ViewModel() {
             while (true) {
                 delay(1000)
                 val currentSongVal = _currentSong.value ?: break
-                if (_currentPosition.value >= currentSongVal.durationSeconds) {
-                    // Song finished, auto play next
-                    playNextSong()
+                
+                if (currentSongVal.filePath != null && mediaPlayer?.isPlaying == true) {
+                    val posSec = (mediaPlayer?.currentPosition ?: 0) / 1000
+                    _currentPosition.value = posSec
+                    if (posSec >= currentSongVal.durationSeconds) {
+                        playNextSong()
+                    }
                 } else {
-                    _currentPosition.value += 1
+                    // Simulated timer for preloaded cloud songs
+                    if (_currentPosition.value >= currentSongVal.durationSeconds) {
+                        playNextSong()
+                    } else {
+                        _currentPosition.value += 1
+                    }
                 }
             }
         }
@@ -188,17 +205,60 @@ class MusicViewModel : ViewModel() {
         playbackJob = null
     }
 
+    private fun playActualSong(song: Song) {
+        try {
+            mediaPlayer?.release()
+            mediaPlayer = null
+            
+            if (song.filePath != null) {
+                mediaPlayer = MediaPlayer().apply {
+                    setDataSource(song.filePath)
+                    prepare()
+                    seekTo(_currentPosition.value * 1000)
+                    if (_isPlaying.value) {
+                        start()
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     // ACTIONS
     fun selectSong(song: Song, forcePlay: Boolean = true) {
         _currentSong.value = song
         _currentPosition.value = 0
         if (forcePlay) {
             _isPlaying.value = true
+            playActualSong(song)
+        } else {
+            _isPlaying.value = false
+            mediaPlayer?.release()
+            mediaPlayer = null
         }
     }
 
     fun togglePlayPause() {
-        _isPlaying.value = !_isPlaying.value
+        val playing = !_isPlaying.value
+        _isPlaying.value = playing
+        
+        val song = _currentSong.value
+        if (song?.filePath != null) {
+            try {
+                if (playing) {
+                    if (mediaPlayer == null) {
+                        playActualSong(song)
+                    } else {
+                        mediaPlayer?.start()
+                    }
+                } else {
+                    mediaPlayer?.pause()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 
     fun playNextSong() {
@@ -229,6 +289,14 @@ class MusicViewModel : ViewModel() {
         val current = _currentSong.value ?: return
         val capped = seconds.coerceIn(0, current.durationSeconds)
         _currentPosition.value = capped
+        
+        if (current.filePath != null) {
+            try {
+                mediaPlayer?.seekTo(capped * 1000)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 
     fun updateSearchQuery(query: String) {
@@ -257,6 +325,102 @@ class MusicViewModel : ViewModel() {
 
     fun setPermissionStatus(granted: Boolean) {
         _hasStoragePermission.value = granted
+    }
+
+    fun scanLocalSongs(context: Context) {
+        viewModelScope.launch {
+            try {
+                val uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+                val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
+                val projection = arrayOf(
+                    MediaStore.Audio.Media._ID,
+                    MediaStore.Audio.Media.TITLE,
+                    MediaStore.Audio.Media.ARTIST,
+                    MediaStore.Audio.Media.ALBUM,
+                    MediaStore.Audio.Media.DURATION,
+                    MediaStore.Audio.Media.DATA
+                )
+                val cursor = context.contentResolver.query(uri, projection, selection, null, null)
+                val songsList = mutableListOf<Song>()
+                
+                if (cursor != null) {
+                    val idCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
+                    val titleCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
+                    val artistCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
+                    val albumCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)
+                    val durationCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
+                    val dataCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
+
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getLong(idCol).toString()
+                        val title = cursor.getString(titleCol) ?: "Pista Desconocida"
+                        val artist = cursor.getString(artistCol) ?: "Artista Desconocido"
+                        val album = cursor.getString(albumCol) ?: "Álbum Desconocido"
+                        val durationMs = cursor.getLong(durationCol)
+                        val filePath = cursor.getString(dataCol)
+                        
+                        val extension = filePath?.substringAfterLast('.', "")?.lowercase() ?: ""
+                        val isSupported = extension in listOf("mp3", "m4a", "wav", "ogg", "flac", "aac", "m4p", "mp4")
+
+                        if (isSupported) {
+                            val durationSecs = (durationMs / 1000).toInt()
+                            val mins = durationSecs / 60
+                            val secs = durationSecs % 60
+                            val durationStr = String.format("%01d:%02d", mins, secs)
+                            
+                            val localLyrics = """
+                                [00:00] Reproduciendo tu archivo local
+                                [00:08] Canción: $title
+                                [00:15] Artista: $artist
+                                [00:22] Sintonizando el pulso de tu código analógico
+                                [00:30] Sonando con fidelidad premium en Kaku Next
+                            """.trimIndent()
+
+                            val colors = listOf(0xFF00F0FF, 0xFFFF007F, 0xFFBD93F9, 0xFF4EFE80, 0xFFFFB86C, 0xFFF1FA8C)
+                            val colorIdx = id.hashCode().coerceAtLeast(0) % colors.size
+                            val pickedColor = colors[colorIdx]
+
+                            songsList.add(
+                                Song(
+                                    id = id,
+                                    title = title,
+                                    artist = artist,
+                                    album = album,
+                                    duration = durationStr,
+                                    durationSeconds = if (durationSecs > 0) durationSecs else 180,
+                                    lyrics = localLyrics,
+                                    coverColor = pickedColor,
+                                    filePath = filePath
+                                )
+                            )
+                        }
+                    }
+                    cursor.close()
+                }
+
+                if (songsList.isNotEmpty()) {
+                    _songsFlow.value = songsList
+                    _currentSong.value = songsList[0]
+                    _currentPosition.value = 0
+                    _showSyncBanner.value = false
+                    
+                    _playlistsFlow.update {
+                        listOf(
+                            Playlist("local_1", "Descargas de Música", "Archivos de audio escaneados en tu dispositivo", songsList),
+                            Playlist("local_2", "Mezclas Recientes", "Canciones locales sugeridas", songsList.shuffled().take(songsList.size.coerceAtMost(5)))
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        mediaPlayer?.release()
+        mediaPlayer = null
     }
 }
 

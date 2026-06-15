@@ -69,6 +69,7 @@ fun HomeScreen(
     val currentSong by viewModel.currentSong.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
     val hasPermission by viewModel.hasStoragePermission.collectAsState()
+    val showSyncBanner by viewModel.showSyncBanner.collectAsState()
 
     val permissionToRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         android.Manifest.permission.READ_MEDIA_AUDIO
@@ -76,10 +77,31 @@ fun HomeScreen(
         android.Manifest.permission.READ_EXTERNAL_STORAGE
     }
 
+    LaunchedEffect(context) {
+        val permissionGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.READ_MEDIA_AUDIO
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        } else {
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.READ_EXTERNAL_STORAGE
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        }
+        viewModel.setPermissionStatus(permissionGranted)
+        if (permissionGranted) {
+            viewModel.scanLocalSongs(context)
+        }
+    }
+
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         viewModel.setPermissionStatus(isGranted)
+        if (isGranted) {
+            viewModel.scanLocalSongs(context)
+        }
         Toast.makeText(
             context,
             if (isGranted) "Acceso concedido a la biblioteca musical" else "Acceso denegado, usando streaming integrado",
@@ -129,35 +151,37 @@ fun HomeScreen(
                 when (status) {
                     true -> {
                         // Permission already granted
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 24.dp)
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(Color(0xFF0F1E19))
-                                .border(1.dp, Color(0xFF00FF87), RoundedCornerShape(16.dp))
-                                .padding(16.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.CheckCircle,
-                                    contentDescription = "Acceso Concedido",
-                                    tint = Color(0xFF00FF87),
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column {
-                                    Text(
-                                        text = "Biblioteca Sincronizada",
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp
+                        if (showSyncBanner) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 24.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(Color(0xFF0F1E19))
+                                    .border(1.dp, Color(0xFF00FF87), RoundedCornerShape(16.dp))
+                                    .padding(16.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.CheckCircle,
+                                        contentDescription = "Acceso Concedido",
+                                        tint = Color(0xFF00FF87),
+                                        modifier = Modifier.size(24.dp)
                                     )
-                                    Text(
-                                        text = "Kaku Next tiene acceso a tus archivos de audio locales.",
-                                        color = Color(0xFFB0C0B8),
-                                        fontSize = 12.sp
-                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column {
+                                        Text(
+                                            text = "Biblioteca Sincronizada",
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp
+                                        )
+                                        Text(
+                                            text = "Kaku Next tiene acceso a tus archivos de audio locales.",
+                                            color = Color(0xFFB0C0B8),
+                                            fontSize = 12.sp
+                                        )
+                                    }
                                 }
                             }
                         }
