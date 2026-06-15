@@ -1282,3 +1282,103 @@ fun SearchScreen(
         }
     }
 }
+
+@Composable
+fun SongsScreen(
+    viewModel: MusicViewModel,
+    modifier: Modifier = Modifier,
+    onSongSelected: (Song) -> Unit
+) {
+    val songs by viewModel.songsFlow.collectAsState()
+    val currentSong by viewModel.currentSong.collectAsState()
+    val isPlaying by viewModel.isPlaying.collectAsState()
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(DeepDark)
+            .padding(horizontal = 20.dp, vertical = 24.dp)
+    ) {
+        Text(
+            text = "Canciones",
+            fontSize = 32.sp,
+            fontWeight = FontWeight.Black,
+            color = Color.White,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+        Text(
+            text = "Tu biblioteca de pistas locales",
+            color = NeonLavender.copy(alpha = 0.8f),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(bottom = 20.dp)
+        )
+
+        if (songs.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MusicNote,
+                        contentDescription = "Sin música",
+                        tint = TextMuted,
+                        modifier = Modifier.size(64.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Biblioteca sin sincronizar",
+                        color = TextWhite,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Concede acceso al almacenamiento desde el Inicio para sincronizar tus canciones locales y reproducirlas.",
+                        color = TextGray,
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 24.dp)
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(bottom = 120.dp)
+            ) {
+                item {
+                    Text(
+                        text = "Todas tus pistas locales (${songs.size})",
+                        color = TextMuted,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                }
+
+                items(songs) { song ->
+                    val isActive = currentSong?.id == song.id
+                    SongRowItem(
+                        song = song,
+                        isActive = isActive,
+                        isPlaying = isPlaying && isActive,
+                        onClick = { onSongSelected(song) },
+                        onFavoriteToggle = { viewModel.toggleFavorite(song.id) }
+                    )
+                }
+            }
+        }
+    }
+}
+

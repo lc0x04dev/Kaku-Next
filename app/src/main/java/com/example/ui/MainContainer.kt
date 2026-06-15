@@ -291,11 +291,11 @@ fun MainContainer(
                         modifier = Modifier.testTag("nav_item_home")
                     )
 
-                    // Player Screen item (Canción)
+                    // Player Screen item (Canción) -> Shows the list of songs
                     NavigationBarItem(
-                        selected = currentRoute == "player",
+                        selected = currentRoute == "songs",
                         onClick = {
-                            navController.navigate("player") {
+                            navController.navigate("songs") {
                                 popUpTo(navController.graph.findStartDestination().id) {
                                     saveState = true
                                 }
@@ -407,6 +407,21 @@ fun MainContainer(
                     viewModel = viewModel,
                     modifier = Modifier.padding(innerPadding)
                 )
+            }
+            composable("songs") {
+                SongsScreen(
+                    viewModel = viewModel,
+                    modifier = Modifier.padding(innerPadding)
+                ) { song ->
+                    viewModel.selectSong(song)
+                    navController.navigate("player") {
+                        popUpTo(navController.graph.findStartDestination().id) {
+                            saveState = true
+                        }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                }
             }
             composable("playlists") {
                 PlaylistsScreen(
