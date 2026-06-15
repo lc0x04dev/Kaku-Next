@@ -1,0 +1,6 @@
+{
+  "name": "Kaku Next",
+  "description": "Una aplicación moderna de reproducción de música en Kotlin con Jetpack Compose y estética de neón.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
