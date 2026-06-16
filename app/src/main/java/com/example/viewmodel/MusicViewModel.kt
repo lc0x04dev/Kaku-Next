@@ -6,8 +6,10 @@ import android.media.MediaPlayer
 import android.media.MediaMetadataRetriever
 import android.os.Environment
 import java.io.File
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import android.content.ContentUris
 import com.example.model.Song
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -19,7 +21,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class MusicViewModel : ViewModel() {
+class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private val availableSongs = emptyList<Song>()
 
@@ -105,7 +107,11 @@ class MusicViewModel : ViewModel() {
             
             if (song.filePath != null) {
                 mediaPlayer = MediaPlayer().apply {
-                    setDataSource(song.filePath)
+                    if (song.filePath.startsWith("content://")) {
+                        setDataSource(getApplication(), android.net.Uri.parse(song.filePath))
+                    } else {
+                        setDataSource(song.filePath)
+                    }
                     prepare()
                     seekTo(_currentPosition.value * 1000)
                     if (_isPlaying.value) {
@@ -254,12 +260,13 @@ class MusicViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val songsList = mutableListOf<Song>()
-                val seenPaths = mutableSetOf<String>()
+                val seenRawPaths = mutableSetOf<String>()
 
-                // 1. Scan via MediaStore
+                // 1. Scan via MediaStore (Broad query to scan all audio files)
                 try {
                     val uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
-                    val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
+                    // Broad query to capture all user-downloaded and local music tracks
+                    val selection = null 
                     val projection = arrayOf(
                         MediaStore.Audio.Media._ID,
                         MediaStore.Audio.Media.TITLE,
@@ -270,26 +277,35 @@ class MusicViewModel : ViewModel() {
                     )
                     val cursor = context.contentResolver.query(uri, projection, selection, null, null)
                     if (cursor != null) {
-                        val idCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
-                        val titleCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
-                        val artistCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
-                        val albumCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)
-                        val durationCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
-                        val dataCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
+                        val idCol = cursor.getColumnIndex(MediaStore.Audio.Media._ID)
+                        val titleCol = cursor.getColumnIndex(MediaStore.Audio.Media.TITLE)
+                        val artistCol = cursor.getColumnIndex(MediaStore.Audio.Media.ARTIST)
+                        val albumCol = cursor.getColumnIndex(MediaStore.Audio.Media.ALBUM)
+                        val durationCol = cursor.getColumnIndex(MediaStore.Audio.Media.DURATION)
+                        val dataCol = cursor.getColumnIndex(MediaStore.Audio.Media.DATA)
 
                         while (cursor.moveToNext()) {
-                            val id = cursor.getLong(idCol).toString()
-                            val title = cursor.getString(titleCol) ?: "Pista Desconocida"
-                            val artist = cursor.getString(artistCol) ?: "Artista Desconocido"
-                            val album = cursor.getString(albumCol) ?: "Álbum Desconocido"
-                            val durationMs = cursor.getLong(durationCol)
-                            val filePath = cursor.getString(dataCol) ?: continue
+                            val id = if (idCol >= 0) cursor.getLong(idCol).toString() else ""
+                            if (id.isEmpty()) continue
+                            
+                            val title = if (titleCol >= 0) cursor.getString(titleCol) ?: "Pista Desconocida" else "Pista Desconocida"
+                            val artist = if (artistCol >= 0) cursor.getString(artistCol) ?: "Artista Desconocido" else "Artista Desconocido"
+                            val album = if (albumCol >= 0) cursor.getString(albumCol) ?: "Álbum Desconocido" else "Álbum Desconocido"
+                            val durationMs = if (durationCol >= 0) cursor.getLong(durationCol) else 0L
+                            val filePath = if (dataCol >= 0) cursor.getString(dataCol) ?: "" else ""
 
+                            // Generate the secure content URI for this media item
+                            val mediaUri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id.toLong())
+                            val pathUriString = mediaUri.toString()
+
+                            // Check file extension of the original path if available; fallback to common audio
                             val extension = filePath.substringAfterLast('.', "").lowercase()
-                            val isSupported = extension in listOf("mp3", "m4a", "wav", "ogg", "flac", "aac", "m4p", "mp4")
+                            val isSupported = filePath.isEmpty() || extension in listOf("mp3", "m4a", "wav", "ogg", "flac", "aac", "m4p", "mp4")
 
-                            if (isSupported && !seenPaths.contains(filePath)) {
-                                seenPaths.add(filePath)
+                            if (isSupported) {
+                                if (filePath.isNotEmpty()) {
+                                    seenRawPaths.add(filePath)
+                                }
                                 val durationSecs = (durationMs / 1000).toInt()
                                 val mins = durationSecs / 60
                                 val secs = durationSecs % 60
@@ -317,7 +333,7 @@ class MusicViewModel : ViewModel() {
                                         durationSeconds = if (durationSecs > 0) durationSecs else 180,
                                         lyrics = localLyrics,
                                         coverColor = pickedColor,
-                                        filePath = filePath
+                                        filePath = pathUriString
                                     )
                                 )
                             }
@@ -328,14 +344,19 @@ class MusicViewModel : ViewModel() {
                     e.printStackTrace()
                 }
 
-                // 2. Scan via Direct Filesystem (including hidden directories and files)
+                // 2. Scan via Direct Filesystem (Targeting public folders specifically to bypass Scoped Storage restrictions)
                 withContext(Dispatchers.IO) {
                     try {
                         val fileResults = mutableListOf<File>()
                         val roots = listOfNotNull(
-                            Environment.getExternalStorageDirectory(),
-                            File("/sdcard"),
-                            File("/storage/emulated/0")
+                            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC),
+                            File(Environment.getExternalStorageDirectory(), "Download"),
+                            File(Environment.getExternalStorageDirectory(), "Music"),
+                            File("/sdcard/Download"),
+                            File("/sdcard/Music"),
+                            File("/storage/emulated/0/Download"),
+                            File("/storage/emulated/0/Music")
                         )
 
                         for (root in roots.distinctBy { it.absolutePath }) {
@@ -348,8 +369,8 @@ class MusicViewModel : ViewModel() {
                         val retriever = MediaMetadataRetriever()
                         for (file in fileResults) {
                             val path = file.absolutePath
-                            if (!seenPaths.contains(path)) {
-                                seenPaths.add(path)
+                            if (!seenRawPaths.contains(path)) {
+                                seenRawPaths.add(path)
                                 var title = file.nameWithoutExtension
                                 var artist = "Artista Desconocido"
                                 var album = "Álbum Desconocido"
