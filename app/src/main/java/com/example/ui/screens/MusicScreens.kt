@@ -70,6 +70,7 @@ fun HomeScreen(
     val isPlaying by viewModel.isPlaying.collectAsState()
     val hasPermission by viewModel.hasStoragePermission.collectAsState()
     val showSyncBanner by viewModel.showSyncBanner.collectAsState()
+    val isScanning by viewModel.isScanning.collectAsState()
 
     val permissionsToRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         arrayOf(
@@ -171,38 +172,73 @@ fun HomeScreen(
                 when (status) {
                     true -> {
                         // Permission already granted
-                        if (showSyncBanner) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(bottom = 24.dp)
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(Color(0xFF0F1E19))
-                                    .border(1.dp, Color(0xFF00FF87), RoundedCornerShape(16.dp))
-                                    .padding(16.dp)
-                            ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 24.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(
+                                    if (isScanning) Color(0xFF0F1A1E)
+                                    else if (songs.isEmpty()) Color(0xFF221910)
+                                    else Color(0xFF0F1E19)
+                                )
+                                .border(
+                                    1.dp,
+                                    if (isScanning) Color(0xFF00D2FF).copy(alpha = 0.5f)
+                                    else if (songs.isEmpty()) Color(0xFFFFB86C).copy(alpha = 0.5f)
+                                    else Color(0xFF00FF87).copy(alpha = 0.5f),
+                                    RoundedCornerShape(16.dp)
+                                )
+                                .padding(16.dp)
+                        ) {
+                            Column {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.CheckCircle,
-                                        contentDescription = "Acceso Concedido",
-                                        tint = Color(0xFF00FF87),
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Column {
-                                        Text(
-                                            text = "Biblioteca Sincronizada",
-                                            color = Color.White,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 14.sp
+                                    if (isScanning) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(20.dp),
+                                            color = Color(0xFF00D2FF),
+                                            strokeWidth = 2.dp
                                         )
-                                        Text(
-                                            text = "Kaku Next tiene acceso a tus archivos de audio locales.",
-                                            color = Color(0xFFB0C0B8),
-                                            fontSize = 12.sp
+                                    } else if (songs.isEmpty()) {
+                                        Icon(
+                                            imageVector = Icons.Default.Info,
+                                            contentDescription = "Sincronización Completa",
+                                            tint = Color(0xFFFFB86C),
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                    } else {
+                                        Icon(
+                                            imageVector = Icons.Default.CheckCircle,
+                                            contentDescription = "Biblioteca Sincronizada",
+                                            tint = Color(0xFF00FF87),
+                                            modifier = Modifier.size(24.dp)
                                         )
                                     }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(
+                                        text = if (isScanning) "Sincronizando música local..."
+                                               else if (songs.isEmpty()) "Sincronización Completa"
+                                               else "Biblioteca Sincronizada",
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
                                 }
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Text(
+                                    text = if (isScanning) {
+                                        "Escaneando almacenamiento y buscando todo tipo de archivos de audio (MP3, M4A, WAV, FLAC, OGG, AAC, MP4)..."
+                                    } else if (songs.isEmpty()) {
+                                        "Kaku Next completó la búsqueda de todo tipo de archivos de audio (MP3, WAV, M4A, FLAC, OGG, AAC) en tu almacenamiento, pero no se ha detectado ninguna canción local en este momento. Intenta descargar música a tus carpetas públicas."
+                                    } else {
+                                        "Se han encontrado ${songs.size} canciones locales en tu dispositivo (MP3, WAV, M4A, FLAC, OGG, AAC) listas para reproducir con alta fidelidad."
+                                    },
+                                    color = if (isScanning) Color(0xFFB0D0FF)
+                                            else if (songs.isEmpty()) Color(0xFFFFDDBB)
+                                            else Color(0xFFB0C0B8),
+                                    fontSize = 12.sp,
+                                    lineHeight = 16.sp
+                                )
                             }
                         }
                     }

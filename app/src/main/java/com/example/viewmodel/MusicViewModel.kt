@@ -54,6 +54,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _showSyncBanner = MutableStateFlow(true)
     val showSyncBanner: StateFlow<Boolean> = _showSyncBanner.asStateFlow()
 
+    private val _isScanning = MutableStateFlow(false)
+    val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
+
     private var playbackJob: Job? = null
     private var mediaPlayer: MediaPlayer? = null
 
@@ -258,14 +261,15 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun scanLocalSongs(context: Context) {
         viewModelScope.launch {
+            _isScanning.value = true
             try {
                 val songsList = mutableListOf<Song>()
                 val seenRawPaths = mutableSetOf<String>()
+                val seenIds = mutableSetOf<String>()
 
-                // 1. Scan via MediaStore (Broad query to scan all audio files)
+                // 1. Scan via MediaStore Audio Media
                 try {
                     val uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
-                    // Broad query to capture all user-downloaded and local music tracks
                     val selection = null 
                     val projection = arrayOf(
                         MediaStore.Audio.Media._ID,
@@ -298,13 +302,13 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                             val mediaUri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id.toLong())
                             val pathUriString = mediaUri.toString()
 
-                            // Check file extension of the original path if available; fallback to common audio
                             val extension = filePath.substringAfterLast('.', "").lowercase()
                             val isSupported = filePath.isEmpty() || extension in listOf("mp3", "m4a", "wav", "ogg", "flac", "aac", "m4p", "mp4")
 
-                            if (isSupported) {
+                            if (isSupported && !seenIds.contains("ms_$id")) {
+                                seenIds.add("ms_$id")
                                 if (filePath.isNotEmpty()) {
-                                    seenRawPaths.add(filePath)
+                                    seenRawPaths.add(filePath.lowercase())
                                 }
                                 val durationSecs = (durationMs / 1000).toInt()
                                 val mins = durationSecs / 60
@@ -325,7 +329,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
                                 songsList.add(
                                     Song(
-                                        id = id,
+                                        id = "ms_$id",
                                         title = title,
                                         artist = artist,
                                         album = album,
@@ -344,7 +348,116 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                     e.printStackTrace()
                 }
 
-                // 2. Scan via Direct Filesystem (Targeting public folders specifically to bypass Scoped Storage restrictions)
+                // 2. Scan via MediaStore.Files (Broad directory search including Download and Music folders)
+                try {
+                    val uri = MediaStore.Files.getContentUri("external")
+                    val projection = arrayOf(
+                        MediaStore.Files.FileColumns._ID,
+                        MediaStore.Files.FileColumns.DISPLAY_NAME,
+                        MediaStore.Files.FileColumns.MIME_TYPE,
+                        MediaStore.Files.FileColumns.DATA,
+                        MediaStore.Files.FileColumns.SIZE
+                    )
+                    val selection = "${MediaStore.Files.FileColumns.MIME_TYPE} LIKE 'audio/%' OR " +
+                                    "${MediaStore.Files.FileColumns.DISPLAY_NAME} LIKE '%.mp3' OR " +
+                                    "${MediaStore.Files.FileColumns.DISPLAY_NAME} LIKE '%.wav' OR " +
+                                    "${MediaStore.Files.FileColumns.DISPLAY_NAME} LIKE '%.m4a' OR " +
+                                    "${MediaStore.Files.FileColumns.DISPLAY_NAME} LIKE '%.ogg' OR " +
+                                    "${MediaStore.Files.FileColumns.DISPLAY_NAME} LIKE '%.flac' OR " +
+                                    "${MediaStore.Files.FileColumns.DISPLAY_NAME} LIKE '%.aac' OR " +
+                                    "${MediaStore.Files.FileColumns.DISPLAY_NAME} LIKE '%.mp4'"
+
+                    val cursor = context.contentResolver.query(uri, projection, selection, null, null)
+                    if (cursor != null) {
+                        val idCol = cursor.getColumnIndex(MediaStore.Files.FileColumns._ID)
+                        val nameCol = cursor.getColumnIndex(MediaStore.Files.FileColumns.DISPLAY_NAME)
+                        val mimeCol = cursor.getColumnIndex(MediaStore.Files.FileColumns.MIME_TYPE)
+                        val dataCol = cursor.getColumnIndex(MediaStore.Files.FileColumns.DATA)
+                        val sizeCol = cursor.getColumnIndex(MediaStore.Files.FileColumns.SIZE)
+
+                        val retriever = MediaMetadataRetriever()
+                        while (cursor.moveToNext()) {
+                            val id = if (idCol >= 0) cursor.getLong(idCol).toString() else ""
+                            if (id.isEmpty()) continue
+                            
+                            val name = if (nameCol >= 0) cursor.getString(nameCol) ?: "" else ""
+                            val filePath = if (dataCol >= 0) cursor.getString(dataCol) ?: "" else ""
+
+                            val pathLower = filePath.lowercase()
+                            val uniqueId = "fs_$id"
+                            if (seenIds.contains(uniqueId) || seenIds.contains("ms_$id") || (filePath.isNotEmpty() && seenRawPaths.contains(pathLower))) {
+                                continue
+                            }
+
+                            val mediaUri = ContentUris.withAppendedId(MediaStore.Files.getContentUri("external"), id.toLong())
+                            val pathUriString = mediaUri.toString()
+
+                            var title = name.substringBeforeLast('.', name)
+                            if (title.isEmpty()) title = "Pista Sin Nombre"
+                            var artist = "Artista Desconocido"
+                            var album = "Álbum Desconocido"
+                            var durationSeconds = 180
+
+                            try {
+                                retriever.setDataSource(context, mediaUri)
+                                val rTitle = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
+                                val rArtist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
+                                val rAlbum = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM)
+                                val rDurationMs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+
+                                if (!rTitle.isNullOrBlank()) title = rTitle
+                                if (!rArtist.isNullOrBlank()) artist = rArtist
+                                if (!rAlbum.isNullOrBlank()) album = rAlbum
+                                if (rDurationMs != null && rDurationMs > 0) {
+                                    durationSeconds = (rDurationMs / 1000).toInt()
+                                }
+                            } catch (e: Exception) {
+                                // use filename fallback
+                            }
+
+                            seenIds.add(uniqueId)
+                            if (filePath.isNotEmpty()) {
+                                seenRawPaths.add(pathLower)
+                            }
+
+                            val mins = durationSeconds / 60
+                            val secs = durationSeconds % 60
+                            val durationStr = String.format("%01d:%02d", mins, secs)
+
+                            val localLyrics = """
+                                [00:00] Reproduciendo tu archivo local (Sincronizado de Descargas)
+                                [00:08] Canción: $title
+                                [00:15] Artista: $artist
+                                [00:22] Sintonizando el pulso de tu código analógico
+                                [00:30] Sonando con fidelidad premium en Kaku Next
+                            """.trimIndent()
+
+                            val colors = listOf(0xFF00F0FF, 0xFFFF007F, 0xFFBD93F9, 0xFF4EFE80, 0xFFFFB86C, 0xFFF1FA8C)
+                            val colorIdx = id.hashCode().coerceAtLeast(0) % colors.size
+                            val pickedColor = colors[colorIdx]
+
+                            songsList.add(
+                                Song(
+                                    id = uniqueId,
+                                    title = title,
+                                    artist = artist,
+                                    album = album,
+                                    duration = durationStr,
+                                    durationSeconds = durationSeconds,
+                                    lyrics = localLyrics,
+                                    coverColor = pickedColor,
+                                    filePath = pathUriString
+                                )
+                            )
+                        }
+                        try { retriever.release() } catch (e: Exception) { }
+                        cursor.close()
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+
+                // 3. Scan via Direct Filesystem (Fallback for older storage setups)
                 withContext(Dispatchers.IO) {
                     try {
                         val fileResults = mutableListOf<File>()
@@ -369,8 +482,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                         val retriever = MediaMetadataRetriever()
                         for (file in fileResults) {
                             val path = file.absolutePath
-                            if (!seenRawPaths.contains(path)) {
-                                seenRawPaths.add(path)
+                            val pathLower = path.lowercase()
+                            if (!seenRawPaths.contains(pathLower)) {
+                                seenRawPaths.add(pathLower)
                                 var title = file.nameWithoutExtension
                                 var artist = "Artista Desconocido"
                                 var album = "Álbum Desconocido"
@@ -409,7 +523,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                                 val colorIdx = path.hashCode().coerceAtLeast(0) % colors.size
                                 val pickedColor = colors[colorIdx]
 
-                                val id = "fs_" + path.hashCode()
+                                val id = "fs_direct_" + path.hashCode()
 
                                 withContext(Dispatchers.Main) {
                                     songsList.add(
@@ -450,6 +564,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
+            } finally {
+                _isScanning.value = false
             }
         }
     }
