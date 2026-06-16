@@ -71,10 +71,15 @@ fun HomeScreen(
     val hasPermission by viewModel.hasStoragePermission.collectAsState()
     val showSyncBanner by viewModel.showSyncBanner.collectAsState()
 
-    val permissionToRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        android.Manifest.permission.READ_MEDIA_AUDIO
+    val permissionsToRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        arrayOf(
+            android.Manifest.permission.READ_MEDIA_AUDIO,
+            android.Manifest.permission.POST_NOTIFICATIONS
+        )
     } else {
-        android.Manifest.permission.READ_EXTERNAL_STORAGE
+        arrayOf(
+            android.Manifest.permission.READ_EXTERNAL_STORAGE
+        )
     }
 
     LaunchedEffect(context) {
@@ -96,17 +101,32 @@ fun HomeScreen(
     }
 
     val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        viewModel.setPermissionStatus(isGranted)
-        if (isGranted) {
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { map ->
+        val storageGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            map[android.Manifest.permission.READ_MEDIA_AUDIO] == true
+        } else {
+            map[android.Manifest.permission.READ_EXTERNAL_STORAGE] == true
+        }
+        val notificationGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            map[android.Manifest.permission.POST_NOTIFICATIONS] == true
+        } else {
+            true
+        }
+
+        viewModel.setPermissionStatus(storageGranted)
+        if (storageGranted) {
             viewModel.scanLocalSongs(context)
         }
-        Toast.makeText(
-            context,
-            if (isGranted) "Acceso concedido a la biblioteca musical" else "Acceso denegado, usando streaming integrado",
-            Toast.LENGTH_SHORT
-        ).show()
+
+        val toastMessage = when {
+            storageGranted && notificationGranted -> "Acceso concedido a música y notificaciones"
+            storageGranted -> "Acceso concedido a música local"
+            notificationGranted -> "Acceso a notificaciones concedido"
+            else -> "Permisos denegados"
+        }
+
+        Toast.makeText(context, toastMessage, Toast.LENGTH_SHORT).show()
     }
 
     LazyColumn(
@@ -222,7 +242,7 @@ fun HomeScreen(
                                 )
                                 Spacer(modifier = Modifier.height(14.dp))
                                 Button(
-                                    onClick = { launcher.launch(permissionToRequest) },
+                                    onClick = { launcher.launch(permissionsToRequest) },
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = NeonCyan,
                                         contentColor = DeepDark

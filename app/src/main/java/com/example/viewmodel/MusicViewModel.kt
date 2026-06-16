@@ -3,11 +3,16 @@ package com.example.viewmodel
 import android.content.Context
 import android.provider.MediaStore
 import android.media.MediaPlayer
+import android.media.MediaMetadataRetriever
+import android.os.Environment
+import java.io.File
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.model.Song
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -221,83 +226,200 @@ class MusicViewModel : ViewModel() {
         _hasStoragePermission.value = granted
     }
 
+    private fun scanFilesDirectly(dir: File, depth: Int, result: MutableList<File>) {
+        if (depth > 12) return // depth limit to avoid stack overflow
+        val list = try { dir.listFiles() } catch (e: Exception) { null } ?: return
+        for (file in list) {
+            val name = file.name
+            if (file.isDirectory) {
+                // Ignore standard OS-specific config/application folders to keep search fast and secure
+                val lowerName = name.lowercase()
+                if (lowerName == "android" || lowerName == "data" || lowerName == "obb" ||
+                    name.startsWith(".android") || name.startsWith(".gradle") || 
+                    name.startsWith(".git") || name.startsWith(".google")
+                ) {
+                    continue
+                }
+                scanFilesDirectly(file, depth + 1, result)
+            } else {
+                val ext = file.extension.lowercase()
+                if (ext in listOf("mp3", "m4a", "wav", "ogg", "flac", "aac", "m4p", "mp4")) {
+                    result.add(file)
+                }
+            }
+        }
+    }
+
     fun scanLocalSongs(context: Context) {
         viewModelScope.launch {
             try {
-                val uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
-                val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
-                val projection = arrayOf(
-                    MediaStore.Audio.Media._ID,
-                    MediaStore.Audio.Media.TITLE,
-                    MediaStore.Audio.Media.ARTIST,
-                    MediaStore.Audio.Media.ALBUM,
-                    MediaStore.Audio.Media.DURATION,
-                    MediaStore.Audio.Media.DATA
-                )
-                val cursor = context.contentResolver.query(uri, projection, selection, null, null)
                 val songsList = mutableListOf<Song>()
-                
-                if (cursor != null) {
-                    val idCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
-                    val titleCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
-                    val artistCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
-                    val albumCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)
-                    val durationCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
-                    val dataCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
+                val seenPaths = mutableSetOf<String>()
 
-                    while (cursor.moveToNext()) {
-                        val id = cursor.getLong(idCol).toString()
-                        val title = cursor.getString(titleCol) ?: "Pista Desconocida"
-                        val artist = cursor.getString(artistCol) ?: "Artista Desconocido"
-                        val album = cursor.getString(albumCol) ?: "Álbum Desconocido"
-                        val durationMs = cursor.getLong(durationCol)
-                        val filePath = cursor.getString(dataCol)
-                        
-                        val extension = filePath?.substringAfterLast('.', "")?.lowercase() ?: ""
-                        val isSupported = extension in listOf("mp3", "m4a", "wav", "ogg", "flac", "aac", "m4p", "mp4")
+                // 1. Scan via MediaStore
+                try {
+                    val uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+                    val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
+                    val projection = arrayOf(
+                        MediaStore.Audio.Media._ID,
+                        MediaStore.Audio.Media.TITLE,
+                        MediaStore.Audio.Media.ARTIST,
+                        MediaStore.Audio.Media.ALBUM,
+                        MediaStore.Audio.Media.DURATION,
+                        MediaStore.Audio.Media.DATA
+                    )
+                    val cursor = context.contentResolver.query(uri, projection, selection, null, null)
+                    if (cursor != null) {
+                        val idCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
+                        val titleCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
+                        val artistCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
+                        val albumCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)
+                        val durationCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
+                        val dataCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
 
-                        if (isSupported) {
-                            val durationSecs = (durationMs / 1000).toInt()
-                            val mins = durationSecs / 60
-                            val secs = durationSecs % 60
-                            val durationStr = String.format("%01d:%02d", mins, secs)
-                            
-                            val localLyrics = """
-                                [00:00] Reproduciendo tu archivo local
-                                [00:08] Canción: $title
-                                [00:15] Artista: $artist
-                                [00:22] Sintonizando el pulso de tu código analógico
-                                [00:30] Sonando con fidelidad premium en Kaku Next
-                            """.trimIndent()
+                        while (cursor.moveToNext()) {
+                            val id = cursor.getLong(idCol).toString()
+                            val title = cursor.getString(titleCol) ?: "Pista Desconocida"
+                            val artist = cursor.getString(artistCol) ?: "Artista Desconocido"
+                            val album = cursor.getString(albumCol) ?: "Álbum Desconocido"
+                            val durationMs = cursor.getLong(durationCol)
+                            val filePath = cursor.getString(dataCol) ?: continue
 
-                            val colors = listOf(0xFF00F0FF, 0xFFFF007F, 0xFFBD93F9, 0xFF4EFE80, 0xFFFFB86C, 0xFFF1FA8C)
-                            val colorIdx = id.hashCode().coerceAtLeast(0) % colors.size
-                            val pickedColor = colors[colorIdx]
+                            val extension = filePath.substringAfterLast('.', "").lowercase()
+                            val isSupported = extension in listOf("mp3", "m4a", "wav", "ogg", "flac", "aac", "m4p", "mp4")
 
-                            songsList.add(
-                                Song(
-                                    id = id,
-                                    title = title,
-                                    artist = artist,
-                                    album = album,
-                                    duration = durationStr,
-                                    durationSeconds = if (durationSecs > 0) durationSecs else 180,
-                                    lyrics = localLyrics,
-                                    coverColor = pickedColor,
-                                    filePath = filePath
+                            if (isSupported && !seenPaths.contains(filePath)) {
+                                seenPaths.add(filePath)
+                                val durationSecs = (durationMs / 1000).toInt()
+                                val mins = durationSecs / 60
+                                val secs = durationSecs % 60
+                                val durationStr = String.format("%01d:%02d", mins, secs)
+
+                                val localLyrics = """
+                                    [00:00] Reproduciendo tu archivo local
+                                    [00:08] Canción: $title
+                                    [00:15] Artista: $artist
+                                    [00:22] Sintonizando el pulso de tu código analógico
+                                    [00:30] Sonando con fidelidad premium en Kaku Next
+                                """.trimIndent()
+
+                                val colors = listOf(0xFF00F0FF, 0xFFFF007F, 0xFFBD93F9, 0xFF4EFE80, 0xFFFFB86C, 0xFFF1FA8C)
+                                val colorIdx = id.hashCode().coerceAtLeast(0) % colors.size
+                                val pickedColor = colors[colorIdx]
+
+                                songsList.add(
+                                    Song(
+                                        id = id,
+                                        title = title,
+                                        artist = artist,
+                                        album = album,
+                                        duration = durationStr,
+                                        durationSeconds = if (durationSecs > 0) durationSecs else 180,
+                                        lyrics = localLyrics,
+                                        coverColor = pickedColor,
+                                        filePath = filePath
+                                    )
                                 )
-                            )
+                            }
                         }
+                        cursor.close()
                     }
-                    cursor.close()
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
 
+                // 2. Scan via Direct Filesystem (including hidden directories and files)
+                withContext(Dispatchers.IO) {
+                    try {
+                        val fileResults = mutableListOf<File>()
+                        val roots = listOfNotNull(
+                            Environment.getExternalStorageDirectory(),
+                            File("/sdcard"),
+                            File("/storage/emulated/0")
+                        )
+
+                        for (root in roots.distinctBy { it.absolutePath }) {
+                            if (root.exists() && root.isDirectory) {
+                                scanFilesDirectly(root, 0, fileResults)
+                            }
+                        }
+
+                        // Process found files
+                        val retriever = MediaMetadataRetriever()
+                        for (file in fileResults) {
+                            val path = file.absolutePath
+                            if (!seenPaths.contains(path)) {
+                                seenPaths.add(path)
+                                var title = file.nameWithoutExtension
+                                var artist = "Artista Desconocido"
+                                var album = "Álbum Desconocido"
+                                var durationSeconds = 180
+
+                                try {
+                                    retriever.setDataSource(path)
+                                    val rTitle = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
+                                    val rArtist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
+                                    val rAlbum = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM)
+                                    val rDurationMs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+
+                                    if (!rTitle.isNullOrBlank()) title = rTitle
+                                    if (!rArtist.isNullOrBlank()) artist = rArtist
+                                    if (!rAlbum.isNullOrBlank()) album = rAlbum
+                                    if (rDurationMs != null && rDurationMs > 0) {
+                                        durationSeconds = (rDurationMs / 1000).toInt()
+                                    }
+                                } catch (e: Exception) {
+                                    // ignore and use fallback values
+                                }
+
+                                val mins = durationSeconds / 60
+                                val secs = durationSeconds % 60
+                                val durationStr = String.format("%01d:%02d", mins, secs)
+
+                                val localLyrics = """
+                                    [00:00] Reproduciendo tu archivo local (Escaneado Directo)
+                                    [00:08] Canción: $title
+                                    [00:15] Artista: $artist
+                                    [00:22] Sintonizando el pulso de tu código analógico
+                                    [00:30] Sonando con fidelidad premium en Kaku Next
+                                """.trimIndent()
+
+                                val colors = listOf(0xFF00F0FF, 0xFFFF007F, 0xFFBD93F9, 0xFF4EFE80, 0xFFFFB86C, 0xFFF1FA8C)
+                                val colorIdx = path.hashCode().coerceAtLeast(0) % colors.size
+                                val pickedColor = colors[colorIdx]
+
+                                val id = "fs_" + path.hashCode()
+
+                                withContext(Dispatchers.Main) {
+                                    songsList.add(
+                                        Song(
+                                            id = id,
+                                            title = title,
+                                            artist = artist,
+                                            album = album,
+                                            duration = durationStr,
+                                            durationSeconds = durationSeconds,
+                                            lyrics = localLyrics,
+                                            coverColor = pickedColor,
+                                            filePath = path
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                        try { retriever.release() } catch (e: Exception) { }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+
+                // Update flows on main thread
                 if (songsList.isNotEmpty()) {
                     _songsFlow.value = songsList
                     _currentSong.value = songsList[0]
                     _currentPosition.value = 0
                     _showSyncBanner.value = false
-                    
+
                     _playlistsFlow.update {
                         listOf(
                             Playlist("local_1", "Descargas de Música", "Archivos de audio escaneados en tu dispositivo", songsList),
