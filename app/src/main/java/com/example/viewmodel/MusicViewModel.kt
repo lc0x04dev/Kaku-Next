@@ -28,15 +28,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _songsFlow = MutableStateFlow<List<Song>>(emptyList())
     val songsFlow: StateFlow<List<Song>> = _songsFlow.asStateFlow()
 
-    // Playback State
-    private val _currentSong = MutableStateFlow<Song?>(null) // Starts empty until song is scanned/loaded
-    val currentSong: StateFlow<Song?> = _currentSong.asStateFlow()
-
-    private val _isPlaying = MutableStateFlow(false)
-    val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
-
-    private val _currentPosition = MutableStateFlow(0)
-    val currentPosition: StateFlow<Int> = _currentPosition.asStateFlow()
+    // Playback State delegado a PlaybackManager
+    val currentSong: StateFlow<Song?> = com.example.service.PlaybackManager.currentSong
+    val isPlaying: StateFlow<Boolean> = com.example.service.PlaybackManager.isPlaying
+    val currentPosition: StateFlow<Int> = com.example.service.PlaybackManager.currentPosition
 
     // Playlist States
     private val _playlistsFlow = MutableStateFlow<List<Playlist>>(emptyList())
@@ -57,154 +52,29 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _isScanning = MutableStateFlow(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
 
-    private var playbackJob: Job? = null
-    private var mediaPlayer: MediaPlayer? = null
-
-    init {
-        // Observe playback state to run active mock or real audio playback
-        viewModelScope.launch {
-            _isPlaying.collect { play ->
-                if (play) {
-                    startPlaybackTimer()
-                } else {
-                    stopPlaybackTimer()
-                }
-            }
-        }
-    }
-
-    private fun startPlaybackTimer() {
-        playbackJob?.cancel()
-        playbackJob = viewModelScope.launch {
-            while (true) {
-                delay(1000)
-                val currentSongVal = _currentSong.value ?: break
-                
-                if (currentSongVal.filePath != null && mediaPlayer?.isPlaying == true) {
-                    val posSec = (mediaPlayer?.currentPosition ?: 0) / 1000
-                    _currentPosition.value = posSec
-                    if (posSec >= currentSongVal.durationSeconds) {
-                        playNextSong()
-                    }
-                } else {
-                    // Simulated timer for preloaded cloud songs
-                    if (_currentPosition.value >= currentSongVal.durationSeconds) {
-                        playNextSong()
-                    } else {
-                        _currentPosition.value += 1
-                    }
-                }
-            }
-        }
-    }
-
-    private fun stopPlaybackTimer() {
-        playbackJob?.cancel()
-        playbackJob = null
-    }
-
-    private fun playActualSong(song: Song) {
-        try {
-            mediaPlayer?.release()
-            mediaPlayer = null
-            
-            if (song.filePath != null) {
-                mediaPlayer = MediaPlayer().apply {
-                    if (song.filePath.startsWith("content://")) {
-                        setDataSource(getApplication(), android.net.Uri.parse(song.filePath))
-                    } else {
-                        setDataSource(song.filePath)
-                    }
-                    prepare()
-                    seekTo(_currentPosition.value * 1000)
-                    if (_isPlaying.value) {
-                        start()
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
     // ACTIONS
     fun selectSong(song: Song, forcePlay: Boolean = true) {
-        _currentSong.value = song
-        _currentPosition.value = 0
         if (forcePlay) {
-            _isPlaying.value = true
-            playActualSong(song)
+            com.example.service.PlaybackManager.playSong(song, _songsFlow.value, getApplication())
         } else {
-            _isPlaying.value = false
-            mediaPlayer?.release()
-            mediaPlayer = null
+            com.example.service.PlaybackManager.selectSongWithoutPlaying(song)
         }
     }
 
     fun togglePlayPause() {
-        val playing = !_isPlaying.value
-        _isPlaying.value = playing
-        
-        val song = _currentSong.value
-        if (song?.filePath != null) {
-            try {
-                if (playing) {
-                    if (mediaPlayer == null) {
-                        playActualSong(song)
-                    } else {
-                        mediaPlayer?.start()
-                    }
-                } else {
-                    mediaPlayer?.pause()
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
+        com.example.service.PlaybackManager.togglePlayPause(getApplication())
     }
 
     fun playNextSong() {
-        val current = _currentSong.value ?: return
-        val list = _songsFlow.value
-        if (list.isEmpty()) return
-        val currentIndex = list.indexOfFirst { it.id == current.id }
-        if (currentIndex != -1 && currentIndex < list.size - 1) {
-            selectSong(list[currentIndex + 1], _isPlaying.value)
-        } else {
-            // Loop back to start
-            if (list.isNotEmpty()) {
-                selectSong(list[0], _isPlaying.value)
-            }
-        }
+        com.example.service.PlaybackManager.playNext(getApplication())
     }
 
     fun playPreviousSong() {
-        val current = _currentSong.value ?: return
-        val list = _songsFlow.value
-        if (list.isEmpty()) return
-        val currentIndex = list.indexOfFirst { it.id == current.id }
-        if (currentIndex > 0) {
-            selectSong(list[currentIndex - 1], _isPlaying.value)
-        } else {
-            // Go to end of list
-            if (list.isNotEmpty()) {
-                selectSong(list.last(), _isPlaying.value)
-            }
-        }
+        com.example.service.PlaybackManager.playPrevious(getApplication())
     }
 
     fun seekTo(seconds: Int) {
-        val current = _currentSong.value ?: return
-        val capped = seconds.coerceIn(0, current.durationSeconds)
-        _currentPosition.value = capped
-        
-        if (current.filePath != null) {
-            try {
-                mediaPlayer?.seekTo(capped * 1000)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
+        com.example.service.PlaybackManager.seekTo(seconds)
     }
 
     fun updateSearchQuery(query: String) {
@@ -214,18 +84,24 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleFavorite(songId: String) {
         _songsFlow.update { list ->
             list.map { song ->
-                if (song.id == songId) song.copy(isFavorite = !song.isFavorite) else song
+                val newSong = if (song.id == songId) song.copy(isFavorite = !song.isFavorite) else song
+                if (song.id == songId) {
+                    com.example.service.PlaybackManager.updateCurrentSong(newSong)
+                }
+                newSong
             }
         }
-        // Sync current song if it's the one modified
-        _currentSong.update { current ->
-            if (current?.id == songId) current.copy(isFavorite = !current.isFavorite) else current
-        }
+        com.example.service.PlaybackManager.updatePlaylist(_songsFlow.value)
+        
         // Sync playlists containing this song
         _playlistsFlow.update { lists ->
             lists.map { playlist ->
                 playlist.copy(songs = playlist.songs.map { s ->
-                    if (s.id == songId) s.copy(isFavorite = !s.isFavorite) else s
+                    val newSong = if (s.id == songId) s.copy(isFavorite = !s.isFavorite) else s
+                    if (s.id == songId) {
+                        com.example.service.PlaybackManager.updateCurrentSong(newSong)
+                    }
+                    newSong
                 })
             }
         }
@@ -551,8 +427,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 // Update flows on main thread
                 if (songsList.isNotEmpty()) {
                     _songsFlow.value = songsList
-                    _currentSong.value = songsList[0]
-                    _currentPosition.value = 0
+                    com.example.service.PlaybackManager.setPlaylist(songsList)
+                    com.example.service.PlaybackManager.selectSongWithoutPlaying(songsList[0])
                     _showSyncBanner.value = false
 
                     _playlistsFlow.update {
@@ -572,8 +448,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         super.onCleared()
-        mediaPlayer?.release()
-        mediaPlayer = null
     }
 }
 
