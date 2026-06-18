@@ -41,9 +41,21 @@ class MusicService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    private fun getAttributedContext(): Context {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            createAttributionContext("default")
+        } else {
+            this
+        }
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action
-        val context = applicationContext
+        val context = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            applicationContext.createAttributionContext("default")
+        } else {
+            applicationContext
+        }
 
         // Sincronizar el contexto en la instancia compartida de PlaybackManager
         PlaybackManager.setSandboxContext(context)
@@ -69,23 +81,24 @@ class MusicService : Service() {
     }
 
     private fun setupMediaSession() {
-        mediaSession = MediaSession(this, "KakuNextSession").apply {
+        val attrContext = getAttributedContext()
+        mediaSession = MediaSession(attrContext, "KakuNextSession").apply {
             isActive = true
             setCallback(object : MediaSession.Callback() {
                 override fun onPlay() {
-                    PlaybackManager.togglePlayPause(applicationContext)
+                    PlaybackManager.togglePlayPause(attrContext)
                 }
 
                 override fun onPause() {
-                    PlaybackManager.togglePlayPause(applicationContext)
+                    PlaybackManager.togglePlayPause(attrContext)
                 }
 
                 override fun onSkipToNext() {
-                    PlaybackManager.playNext(applicationContext)
+                    PlaybackManager.playNext(attrContext)
                 }
 
                 override fun onSkipToPrevious() {
-                    PlaybackManager.playPrevious(applicationContext)
+                    PlaybackManager.playPrevious(attrContext)
                 }
 
                 override fun onStop() {

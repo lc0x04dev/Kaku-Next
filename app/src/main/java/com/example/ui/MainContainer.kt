@@ -61,65 +61,51 @@ fun MainContainer(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        // Glowing Project status Indicator Circle badge
-                        Box(
-                            modifier = Modifier
-                                .size(38.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    Brush.linearGradient(
-                                        colors = listOf(NeonCyan, NeonMagenta)
-                                    )
-                                )
-                                .padding(2.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .clip(CircleShape)
-                                    .background(DeepDark),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "KN",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Black,
-                                    color = NeonCyan,
-                                    letterSpacing = (-1).sp,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                            }
-                        }
-
-                        // Project Title Name Info
-                        Column {
-                            Text(
-                                text = "PROJECT",
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = TextGray,
-                                letterSpacing = 2.sp
-                            )
-                            Text(
-                                text = "Kaku Next",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color.White
-                            )
-                        }
+                    // Project Title Name Info
+                    Column {
+                        Text(
+                            text = "PROJECT",
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextGray,
+                            letterSpacing = 2.sp
+                        )
+                        Text(
+                            text = "Kaku Next",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White
+                        )
                     }
 
-                    // More vertical icon
-                    IconButton(onClick = {}) {
-                        Icon(
-                            imageVector = Icons.Default.MoreVert,
-                            contentDescription = "Opciones",
-                            tint = TextWhite
-                        )
+                    // Glowing Project status Indicator Circle badge on the right
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.linearGradient(
+                                    colors = listOf(NeonCyan, NeonMagenta)
+                                )
+                            )
+                            .padding(2.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(CircleShape)
+                                .background(DeepDark),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "KN",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Black,
+                                color = NeonCyan,
+                                letterSpacing = (-1).sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
                     }
                 }
             }

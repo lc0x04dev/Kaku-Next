@@ -52,25 +52,34 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _isScanning = MutableStateFlow(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
 
+    private fun getAttributedContext(): Context {
+        val app = getApplication<Application>()
+        return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            app.createAttributionContext("default")
+        } else {
+            app
+        }
+    }
+
     // ACTIONS
     fun selectSong(song: Song, forcePlay: Boolean = true) {
         if (forcePlay) {
-            com.example.service.PlaybackManager.playSong(song, _songsFlow.value, getApplication())
+            com.example.service.PlaybackManager.playSong(song, _songsFlow.value, getAttributedContext())
         } else {
             com.example.service.PlaybackManager.selectSongWithoutPlaying(song)
         }
     }
 
     fun togglePlayPause() {
-        com.example.service.PlaybackManager.togglePlayPause(getApplication())
+        com.example.service.PlaybackManager.togglePlayPause(getAttributedContext())
     }
 
     fun playNextSong() {
-        com.example.service.PlaybackManager.playNext(getApplication())
+        com.example.service.PlaybackManager.playNext(getAttributedContext())
     }
 
     fun playPreviousSong() {
-        com.example.service.PlaybackManager.playPrevious(getApplication())
+        com.example.service.PlaybackManager.playPrevious(getAttributedContext())
     }
 
     fun seekTo(seconds: Int) {

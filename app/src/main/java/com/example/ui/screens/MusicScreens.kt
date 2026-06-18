@@ -553,7 +553,7 @@ fun PlayerScreen(
 
     val song = currentSong!!
     val accentColor = Color(song.coverColor)
-    val pagerState = rememberPagerState(pageCount = { 2 })
+    val pagerState = rememberPagerState(pageCount = { 3 })
     val coroutineScope = rememberCoroutineScope()
 
     Column(
@@ -575,7 +575,7 @@ fun PlayerScreen(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val options = listOf("Portada", "Letra")
+            val options = listOf("Portada", "Letra", "vídeo")
             options.forEachIndexed { index, title ->
                 val selected = pagerState.currentPage == index
                 Box(
@@ -614,162 +614,169 @@ fun PlayerScreen(
                 .weight(1f)
                 .testTag("player_pager")
         ) { page ->
-            if (page == 0) {
-                // Page 0: Cover artwork/image
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(12.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    // Atmospheric glowing vinyl/album art cover (Immersive design spec)
+            when (page) {
+                0 -> {
+                    // Page 0: Cover artwork/image
                     Box(
                         modifier = Modifier
-                            .size(240.dp)
-                            .padding(4.dp),
+                            .fillMaxSize()
+                            .padding(12.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        // Glow backdrop aura
+                        // Atmospheric glowing vinyl/album art cover (Immersive design spec)
                         Box(
                             modifier = Modifier
-                                .fillMaxSize()
-                                .clip(RoundedCornerShape(24.dp))
-                                .background(
-                                    Brush.linearGradient(
-                                        colors = listOf(
-                                            NeonCyan.copy(alpha = 0.15f),
-                                            Color.Transparent,
-                                            NeonMagenta.copy(alpha = 0.15f)
-                                        )
-                                    )
-                                )
-                        )
-
-                        // Main outer core
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(8.dp)
-                                .clip(RoundedCornerShape(24.dp))
-                                .background(SurfaceDark)
-                                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(24.dp)),
+                                .size(240.dp)
+                                .padding(4.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            // Inner card disc frame
+                            // Glow backdrop aura
                             Box(
                                 modifier = Modifier
-                                    .size(150.dp)
-                                    .clip(RoundedCornerShape(20.dp))
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(24.dp))
                                     .background(
                                         Brush.linearGradient(
-                                            colors = listOf(Color(0xFF1C1C1C), Color(0xFF0C0C0C))
+                                            colors = listOf(
+                                                NeonCyan.copy(alpha = 0.15f),
+                                                Color.Transparent,
+                                                NeonMagenta.copy(alpha = 0.15f)
+                                            )
                                         )
                                     )
-                                    .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(20.dp)),
+                            )
+
+                            // Main outer core
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(8.dp)
+                                    .clip(RoundedCornerShape(24.dp))
+                                    .background(SurfaceDark)
+                                    .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(24.dp)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.MusicNote,
-                                    contentDescription = "Music Note",
-                                    tint = accentColor.copy(alpha = 0.5f),
-                                    modifier = Modifier.size(64.dp)
-                                )
+                                // Inner card disc frame
+                                Box(
+                                    modifier = Modifier
+                                        .size(150.dp)
+                                        .clip(RoundedCornerShape(20.dp))
+                                        .background(
+                                            Brush.linearGradient(
+                                                colors = listOf(Color(0xFF1C1C1C), Color(0xFF0C0C0C))
+                                            )
+                                        )
+                                        .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(20.dp)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.MusicNote,
+                                        contentDescription = "Music Note",
+                                        tint = accentColor.copy(alpha = 0.5f),
+                                        modifier = Modifier.size(64.dp)
+                                    )
+                                }
                             }
                         }
                     }
                 }
-            } else {
-                // Page 1: Lyrics list Box
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(bottom = 8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    // LYRICS CONTAINER (Verified Lyrics box with absolute minimum borders)
+                1 -> {
+                    // Page 1: Lyrics list Box
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .fillMaxHeight()
-                            .clip(RoundedCornerShape(24.dp))
-                            .background(CardDark) // bg-[#0C0C0C]
-                            .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(24.dp)) // border border-white/5
-                            .padding(20.dp)
-                            .testTag("lyrics_container")
+                            .fillMaxSize()
+                            .padding(bottom = 8.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Column(modifier = Modifier.fillMaxSize()) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Lyrics Verified",
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Black,
-                                    letterSpacing = 2.sp,
-                                    color = NeonCyan
-                                )
-                                Icon(
-                                    imageVector = Icons.Default.CheckCircle,
-                                    contentDescription = "Verified Icon",
-                                    tint = NeonCyan,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                            }
-
-                            if (!song.lyrics.isNullOrBlank()) {
-                                LazyColumn(
-                                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
+                        // LYRICS CONTAINER (Verified Lyrics box with absolute minimum borders)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(24.dp))
+                                .background(CardDark) // bg-[#0C0C0C]
+                                .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(24.dp)) // border border-white/5
+                                .padding(20.dp)
+                                .testTag("lyrics_container")
+                        ) {
+                            Column(modifier = Modifier.fillMaxSize()) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    items(song.lyrics.split("\n")) { line ->
-                                        val lineClean = line.trim()
-                                        if (lineClean.isNotEmpty()) {
-                                            // Match line containing '[' or ']' or styled specially
-                                            val isHighlighted = lineClean.contains("[") || lineClean.contains("]") || lineClean.contains("código") || lineClean.contains("silencio")
-                                            Text(
-                                                text = lineClean.replace("[", "").replace("]", ""),
-                                                color = if (isHighlighted) Color.White else TextGray,
-                                                fontSize = if (isHighlighted) 17.sp else 14.sp,
-                                                fontWeight = if (isHighlighted) FontWeight.Bold else FontWeight.Medium,
-                                                textAlign = TextAlign.Center,
-                                                lineHeight = if (isHighlighted) 22.sp else 19.sp,
-                                                modifier = Modifier.fillMaxWidth()
-                                            )
+                                    Text(
+                                        text = "Lyrics Verified",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Black,
+                                        letterSpacing = 2.sp,
+                                        color = NeonCyan
+                                    )
+                                    Icon(
+                                        imageVector = Icons.Default.CheckCircle,
+                                        contentDescription = "Verified Icon",
+                                        tint = NeonCyan,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+
+                                if (!song.lyrics.isNullOrBlank()) {
+                                    LazyColumn(
+                                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        items(song.lyrics.split("\n")) { line ->
+                                            val lineClean = line.trim()
+                                            if (lineClean.isNotEmpty()) {
+                                                // Match line containing '[' or ']' or styled specially
+                                                val isHighlighted = lineClean.contains("[") || lineClean.contains("]") || lineClean.contains("código") || lineClean.contains("silencio")
+                                                Text(
+                                                    text = lineClean.replace("[", "").replace("]", ""),
+                                                    color = if (isHighlighted) Color.White else TextGray,
+                                                    fontSize = if (isHighlighted) 17.sp else 14.sp,
+                                                    fontWeight = if (isHighlighted) FontWeight.Bold else FontWeight.Medium,
+                                                    textAlign = TextAlign.Center,
+                                                    lineHeight = if (isHighlighted) 22.sp else 19.sp,
+                                                    modifier = Modifier.fillMaxWidth()
+                                                )
+                                            }
                                         }
                                     }
-                                }
-                            } else {
-                                Box(
-                                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.Center
+                                } else {
+                                    Box(
+                                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                                        contentAlignment = Alignment.Center
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.Default.SearchOff,
-                                            contentDescription = "Sin Letra",
-                                            tint = TextMuted,
-                                            modifier = Modifier.size(40.dp)
-                                        )
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Text(
-                                            text = "No hay letra disponible para esta canción.",
-                                            color = TextGray,
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            textAlign = TextAlign.Center,
-                                            modifier = Modifier.padding(horizontal = 16.dp).testTag("no_lyrics_message")
-                                        )
+                                        Column(
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.SearchOff,
+                                                contentDescription = "Sin Letra",
+                                                tint = TextMuted,
+                                                modifier = Modifier.size(40.dp)
+                                            )
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Text(
+                                                text = "No hay letra disponible para esta canción.",
+                                                color = TextGray,
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                textAlign = TextAlign.Center,
+                                                modifier = Modifier.padding(horizontal = 16.dp).testTag("no_lyrics_message")
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
                     }
+                }
+                2 -> {
+                    // Page 2: video player content
+                    VideoPage(song = song, isPlaying = isPlaying)
                 }
             }
         }
@@ -922,6 +929,330 @@ fun PlayerScreen(
                     tint = TextWhite,
                     modifier = Modifier.size(26.dp)
                 )
+            }
+        }
+    }
+}
+
+@Composable
+fun VideoPage(
+    song: Song,
+    isPlaying: Boolean,
+    modifier: Modifier = Modifier
+) {
+    var videoMode by remember { mutableStateOf("Neon Pulse") }
+    val modes = listOf("Neon Pulse", "Cyber Grid", "Synthwave")
+
+    val infiniteTransition = rememberInfiniteTransition(label = "video_effects")
+    
+    // Wave animation offsets
+    val waveOffset1 by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 2f * Math.PI.toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "wave1"
+    )
+
+    val waveOffset2 by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = -2f * Math.PI.toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "wave2"
+    )
+
+    // Pulse animation for neon glow
+    val glowIntensity by infiniteTransition.animateFloat(
+        initialValue = 0.5f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glow"
+    )
+
+    val colorAccent = Color(song.coverColor)
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(bottom = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // VIDEO SCREEN FRAME (16:9 aspect ratio or matching available height)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .clip(RoundedCornerShape(24.dp))
+                .background(Color.Black)
+                .border(2.dp, colorAccent.copy(alpha = 0.3f), RoundedCornerShape(24.dp))
+                .padding(2.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            // Simulated RGB/Scanline scanlines backdrop if Cyber Grid
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(22.dp))
+            ) {
+                // Background dark space
+                drawRect(Color(0xFF050505))
+
+                // Draw scan lines for sci-fi atmosphere
+                val lineSpacing = 6.dp.toPx()
+                val lineCount = (size.height / lineSpacing).toInt()
+                for (i in 0..lineCount) {
+                    val y = i * lineSpacing
+                    drawLine(
+                        color = Color.White.copy(alpha = 0.02f),
+                        start = androidx.compose.ui.geometry.Offset(0f, y),
+                        end = androidx.compose.ui.geometry.Offset(size.width, y),
+                        strokeWidth = 1.dp.toPx()
+                    )
+                }
+
+                // Cyber Grid elements
+                if (videoMode == "Cyber Grid") {
+                    val gridCols = 15
+                    val gridWidth = size.width / gridCols
+                    for (x in 0..gridCols) {
+                        drawLine(
+                            color = colorAccent.copy(alpha = 0.04f),
+                            start = androidx.compose.ui.geometry.Offset(x * gridWidth, 0f),
+                            end = androidx.compose.ui.geometry.Offset(x * gridWidth, size.height),
+                            strokeWidth = 1.dp.toPx()
+                        )
+                    }
+                }
+            }
+
+            // High Fidelity Animated Graphic Visualizer
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(22.dp))
+                    .padding(horizontal = 16.dp)
+            ) {
+                val width = size.width
+                val height = size.height
+                val midY = height / 2f
+
+                // Draw audio wave reactive spectrum
+                val points = 80
+                val spacing = width / points
+
+                val path1 = androidx.compose.ui.graphics.Path()
+                val path2 = androidx.compose.ui.graphics.Path()
+
+                path1.moveTo(0f, midY)
+                path2.moveTo(0f, midY)
+
+                for (i in 0..points) {
+                    val x = i * spacing
+                    val progress = i.toFloat() / points
+                    // Envelope to keep wave centered and fade at edges (fade-in, fade-out edges)
+                    val envelope = Math.sin(progress * Math.PI).toFloat()
+
+                    // Wave form calculations
+                    val frequency1 = if (isPlaying) 4f else 2f
+                    val amplitude1 = if (isPlaying) 50.dp.toPx() * envelope * glowIntensity else 10.dp.toPx() * envelope
+                    val y1 = midY + amplitude1 * Math.sin((progress * frequency1 * Math.PI) + waveOffset1).toFloat()
+
+                    val frequency2 = if (isPlaying) 6f else 3f
+                    val amplitude2 = if (isPlaying) 35.dp.toPx() * envelope * (1.5f - glowIntensity) else 8.dp.toPx() * envelope
+                    val y2 = midY + amplitude2 * Math.cos((progress * frequency2 * Math.PI) + waveOffset2).toFloat()
+
+                    path1.lineTo(x, y1)
+                    path2.lineTo(x, y2)
+                }
+
+                // Render first neon wave
+                drawPath(
+                    path = path1,
+                    color = colorAccent,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(
+                        width = 3.dp.toPx(),
+                        cap = androidx.compose.ui.graphics.StrokeCap.Round
+                    )
+                )
+
+                // Render secondary supporting wave
+                drawPath(
+                    path = path2,
+                    color = if (videoMode == "Synthwave") NeonMagenta else NeonCyan,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(
+                        width = 1.5.dp.toPx(),
+                        cap = androidx.compose.ui.graphics.StrokeCap.Round
+                    )
+                )
+
+                // Bottom frequency bar charts or spectrum blocks
+                val barCount = 20
+                val barGap = 4.dp.toPx()
+                val barWidth = (width - (barCount - 1) * barGap) / barCount
+                for (b in 0 until barCount) {
+                    val progress = b.toFloat() / barCount
+                    val envelope = Math.sin(progress * Math.PI).toFloat()
+                    val barHeight = if (isPlaying) {
+                        (30.dp.toPx() + Math.sin(((progress * 5f) + waveOffset1).toDouble()).toFloat() * 15.dp.toPx()) * envelope * glowIntensity
+                    } else {
+                        5.dp.toPx()
+                    }
+                    val rx = b * (barWidth + barGap)
+                    val ry = height - barHeight - 16.dp.toPx()
+
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(colorAccent.copy(alpha = 0.8f), colorAccent.copy(alpha = 0.1f))
+                        ),
+                        topLeft = androidx.compose.ui.geometry.Offset(rx, ry),
+                        size = androidx.compose.ui.geometry.Size(barWidth, barHeight)
+                    )
+                }
+            }
+
+            // FLOATING MOVIE/VIDEO INFO OVERLAYS (Cyber HUD specs)
+            // Blinking Recording indicator
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                // If is playing, show red dot; if paused, show outline pulse
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (isPlaying && glowIntensity > 0.7f) Color.Red else Color.Red.copy(alpha = 0.3f)
+                        )
+                )
+                Text(
+                    text = "LIVE",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color.White,
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = 1.sp
+                )
+            }
+
+            // Top right system/track quality specs
+            Column(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    text = "CYBER_V3",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = NeonCyan,
+                    fontFamily = FontFamily.Monospace
+                )
+                Text(
+                    text = if (isPlaying) "60.0 FPS" else "IDLE",
+                    fontSize = 8.sp,
+                    color = Color.White.copy(alpha = 0.6f),
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+
+            // Bottom-left track overlay label showing track abbreviation/ID
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(1.dp)
+            ) {
+                Text(
+                    text = "TRACK // ${song.title.uppercase()}",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color.White,
+                    letterSpacing = 0.5.sp,
+                    fontFamily = FontFamily.Monospace
+                )
+                Text(
+                    text = "RENDERER: NEON_MATRIX_RESOLVER",
+                    fontSize = 8.sp,
+                    color = Color.White.copy(alpha = 0.5f),
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+
+            // Center Play Overlay icon if PAUSED
+            if (!isPlaying) {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.7f))
+                        .border(1.dp, colorAccent, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = "Reproducir Video",
+                        tint = colorAccent,
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // MOUNT VIDEO RENDERER SWITCHER MENU (From layout screenshot specifications)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Render:",
+                fontSize = 11.sp,
+                color = TextGray,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(end = 4.dp)
+            )
+
+            modes.forEach { mode ->
+                val active = (videoMode == mode)
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (active) colorAccent.copy(alpha = 0.15f) else ContainerDark)
+                        .clickable { videoMode = mode }
+                        .border(
+                            width = 1.dp,
+                            color = if (active) colorAccent.copy(alpha = 0.4f) else Color.White.copy(alpha = 0.05f),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = mode,
+                        color = if (active) colorAccent else TextWhite.copy(alpha = 0.9f),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
     }
