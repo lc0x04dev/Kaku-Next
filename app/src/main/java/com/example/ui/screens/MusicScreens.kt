@@ -73,17 +73,32 @@ fun HomeScreen(
     val isScanning by viewModel.isScanning.collectAsState()
 
     val permissionsToRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        arrayOf(
-            android.Manifest.permission.READ_MEDIA_AUDIO,
-            android.Manifest.permission.POST_NOTIFICATIONS
-        )
+        arrayOf(android.Manifest.permission.READ_MEDIA_AUDIO)
     } else {
-        arrayOf(
-            android.Manifest.permission.READ_EXTERNAL_STORAGE
-        )
+        arrayOf(android.Manifest.permission.READ_EXTERNAL_STORAGE)
+    }
+
+    val notificationLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            Toast.makeText(context, "Notificaciones de reproducción activadas", Toast.LENGTH_SHORT).show()
+        }
     }
 
     LaunchedEffect(context) {
+        // 1. Request notification permission independently on startup if we are on Android 13+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val hasNotificationPermission = androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.POST_NOTIFICATIONS
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            if (!hasNotificationPermission) {
+                notificationLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+
+        // 2. Check and sync local song access status
         val permissionGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             androidx.core.content.ContextCompat.checkSelfPermission(
                 context,
@@ -109,22 +124,16 @@ fun HomeScreen(
         } else {
             map[android.Manifest.permission.READ_EXTERNAL_STORAGE] == true
         }
-        val notificationGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            map[android.Manifest.permission.POST_NOTIFICATIONS] == true
-        } else {
-            true
-        }
 
         viewModel.setPermissionStatus(storageGranted)
         if (storageGranted) {
             viewModel.scanLocalSongs(context)
         }
 
-        val toastMessage = when {
-            storageGranted && notificationGranted -> "Acceso concedido a música y notificaciones"
-            storageGranted -> "Acceso concedido a música local"
-            notificationGranted -> "Acceso a notificaciones concedido"
-            else -> "Permisos denegados"
+        val toastMessage = if (storageGranted) {
+            "Acceso concedido a música local"
+        } else {
+            "Permiso de almacenamiento denegado"
         }
 
         Toast.makeText(context, toastMessage, Toast.LENGTH_SHORT).show()
