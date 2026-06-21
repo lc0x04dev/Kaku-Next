@@ -119,3 +119,66 @@ dependencies {
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
 }
+
+abstract class CopyApkForDownloadTask : DefaultTask() {
+  @get:Internal
+  abstract val rootDirectory: DirectoryProperty
+
+  @get:Internal
+  abstract val buildDirectory: DirectoryProperty
+
+  @TaskAction
+  fun run() {
+    try {
+      val root = rootDirectory.get().asFile
+      val bld = buildDirectory.get().asFile
+      val possibleSources = listOf(
+        File("/.build-outputs/app-debug.apk"),
+        File(root, ".build-outputs/app-debug.apk"),
+        File(bld, "outputs/apk/debug/app-debug.apk"),
+        File(bld, "outputs/apk/debug/app/debug/app-debug.apk")
+      )
+      
+      var copied = false
+      for (source in possibleSources) {
+        if (source.exists()) {
+          val destTest = File(root, "app-debug.test")
+          val destNoExt = File(root, "app-debug")
+          source.copyTo(destTest, overwrite = true)
+          source.copyTo(destNoExt, overwrite = true)
+          
+          val bldDestTest = File(bld, "app-debug.test")
+          val bldDestNoExt = File(bld, "app-debug")
+          source.copyTo(bldDestTest, overwrite = true)
+          source.copyTo(bldDestNoExt, overwrite = true)
+          
+          println("==================================================")
+          println("🎉 APK COPIADO EXITOSAMENTE PARA DESCARGAR 🎉")
+          println("Destino 1: ${destTest.absolutePath}")
+          println("Destino 2: ${destNoExt.absolutePath}")
+          println("Destino 3: ${bldDestTest.absolutePath}")
+          println("==================================================")
+          copied = true
+          break
+        }
+      }
+      if (!copied) {
+        println("=== ADVERTENCIA: No se encontró el APK de origen para copiar ===")
+      }
+    } catch (e: Exception) {
+      println("=== Error en copiar APK: ${e.message} ===")
+    }
+  }
+}
+
+val copyApkTask = tasks.register<CopyApkForDownloadTask>("copyApkForDownload") {
+  rootDirectory.set(rootDir)
+  buildDirectory.set(layout.buildDirectory)
+}
+
+tasks.configureEach {
+  if (name.contains("assembleDebug", ignoreCase = true) || name.contains("packageDebug", ignoreCase = true)) {
+    finalizedBy(copyApkTask)
+  }
+}
+

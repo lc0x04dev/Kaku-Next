@@ -86,6 +86,12 @@ object PlaybackManager {
 
             if (song.filePath != null) {
                 mediaPlayer = MediaPlayer().apply {
+                    setOnErrorListener { _, what, extra ->
+                        android.util.Log.e("PlaybackManager", "Error de MediaPlayer: what=$what, extra=$extra")
+                        _isPlaying.value = false
+                        stopTimer()
+                        true
+                    }
                     if (song.filePath.startsWith("content://")) {
                         setDataSource(context, android.net.Uri.parse(song.filePath))
                     } else {

@@ -575,7 +575,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 if (songsList.isNotEmpty()) {
                     _songsFlow.value = songsList
                     com.example.service.PlaybackManager.setPlaylist(songsList)
-                    com.example.service.PlaybackManager.selectSongWithoutPlaying(songsList[0])
+                    if (com.example.service.PlaybackManager.currentSong.value == null) {
+                        com.example.service.PlaybackManager.selectSongWithoutPlaying(songsList[0])
+                    }
                     _showSyncBanner.value = false
 
                     _playlistsFlow.update {
