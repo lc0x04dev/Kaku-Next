@@ -20,8 +20,8 @@ fun MyApplicationTheme(
 
     val accentColor = if (useCustomColors) Color(selectedColorVal) else NeonCyan
     val bgThemeColor = if (isAmoled) Color.Black else DeepDark
-    val surfaceColor = if (isAmoled) Color(0xFF080808) else SurfaceDark
-    val cardColor = if (isAmoled) Color(0xFF0C0C0C) else CardDark
+    val surfaceColor = if (isAmoled) Color.Black else SurfaceDark
+    val cardColor = if (isAmoled) Color.Black else CardDark
 
     val themeColorScheme = darkColorScheme(
         primary = accentColor,

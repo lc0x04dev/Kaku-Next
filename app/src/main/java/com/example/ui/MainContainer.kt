@@ -261,7 +261,7 @@ fun MainContainer(
                     // BOTTOM NAVIGATION BAR (Only visible on mainRoutes)
                     NavigationBar(
                         containerColor = bottomBarBgColor,
-                        tonalElevation = 8.dp,
+                        tonalElevation = 0.dp,
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("bottom_nav_bar")
