@@ -4,29 +4,41 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.graphics.Color
-
-private val NeonDarkColorScheme = darkColorScheme(
-    primary = NeonCyan,
-    secondary = NeonMagenta,
-    tertiary = NeonLavender,
-    background = DeepDark,
-    surface = SurfaceDark,
-    onBackground = TextWhite,
-    onSurface = TextWhite,
-    primaryContainer = CardDark,
-    onPrimaryContainer = TextWhite,
-    secondaryContainer = Color(0xFF2C243C),
-    onSecondaryContainer = NeonLavender
-)
+import com.example.viewmodel.MusicViewModel
 
 @Composable
 fun MyApplicationTheme(
-    darkTheme: Boolean = true, // Force dark theme for the modern cyberpunk dark music aesthetic
+    viewModel: MusicViewModel? = null,
     content: @Composable () -> Unit
 ) {
+    // If viewModel is not null, collect state. Otherwise use defaults.
+    val isAmoled = viewModel?.amoledScreen?.collectAsState()?.value ?: false
+    val useCustomColors = viewModel?.useCustomColors?.collectAsState()?.value ?: false
+    val selectedColorVal = viewModel?.selectedCustomColor?.collectAsState()?.value ?: 0xFF00FFFF
+
+    val accentColor = if (useCustomColors) Color(selectedColorVal) else NeonCyan
+    val bgThemeColor = if (isAmoled) Color.Black else DeepDark
+    val surfaceColor = if (isAmoled) Color(0xFF080808) else SurfaceDark
+    val cardColor = if (isAmoled) Color(0xFF0C0C0C) else CardDark
+
+    val themeColorScheme = darkColorScheme(
+        primary = accentColor,
+        secondary = NeonMagenta,
+        tertiary = NeonLavender,
+        background = bgThemeColor,
+        surface = surfaceColor,
+        onBackground = TextWhite,
+        onSurface = TextWhite,
+        primaryContainer = cardColor,
+        onPrimaryContainer = TextWhite,
+        secondaryContainer = Color(0xFF2C243C),
+        onSecondaryContainer = NeonLavender
+    )
+
     MaterialTheme(
-        colorScheme = NeonDarkColorScheme,
+        colorScheme = themeColorScheme,
         typography = Typography,
         content = content
     )

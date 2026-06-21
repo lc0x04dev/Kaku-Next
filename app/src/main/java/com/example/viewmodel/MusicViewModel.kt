@@ -23,6 +23,121 @@ import kotlinx.coroutines.launch
 
 class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
+    private val prefs = application.getSharedPreferences("kaku_next_settings", Context.MODE_PRIVATE)
+
+    // Configuration states
+    private val _audioHiFi = MutableStateFlow(prefs.getBoolean("prefs_audio_hifi", true))
+    val audioHiFi = _audioHiFi.asStateFlow()
+
+    private val _customTitle = MutableStateFlow(prefs.getString("prefs_custom_title", "Lune") ?: "Lune")
+    val customTitle = _customTitle.asStateFlow()
+
+    private val _customSections = MutableStateFlow(prefs.getBoolean("prefs_custom_sections", false))
+    val customSections = _customSections.asStateFlow()
+
+    private val _useCustomColors = MutableStateFlow(prefs.getBoolean("prefs_use_custom_colors", false))
+    val useCustomColors = _useCustomColors.asStateFlow()
+
+    private val _selectedCustomColor = MutableStateFlow(prefs.getLong("prefs_selected_custom_color", 0xFF4CAF50)) // Green by default (checked circle from Image 5)
+    val selectedCustomColor = _selectedCustomColor.asStateFlow()
+
+    private val _amoledScreen = MutableStateFlow(prefs.getBoolean("prefs_amoled_screen", false))
+    val amoledScreen = _amoledScreen.asStateFlow()
+
+    private val _opticalVibration = MutableStateFlow(prefs.getBoolean("prefs_optical_vibration", false))
+    val opticalVibration = _opticalVibration.asStateFlow()
+
+    private val _songInfo = MutableStateFlow(prefs.getBoolean("prefs_song_info", true))
+    val songInfo = _songInfo.asStateFlow()
+
+    private val _cinematicPlayer = MutableStateFlow(prefs.getBoolean("prefs_cinematic_player", false))
+    val cinematicPlayer = _cinematicPlayer.asStateFlow()
+
+    private val _coverShape = MutableStateFlow(prefs.getString("prefs_cover_shape", "Por defecto") ?: "Por defecto")
+    val coverShape = _coverShape.asStateFlow()
+
+    private val _coverSize = MutableStateFlow(prefs.getString("prefs_cover_size", "100%") ?: "100%")
+    val coverSize = _coverSize.asStateFlow()
+
+    private val _buttonStyle = MutableStateFlow(prefs.getString("prefs_button_style", "Por defecto") ?: "Por defecto")
+    val buttonStyle = _buttonStyle.asStateFlow()
+
+    private val _filledIcons = MutableStateFlow(prefs.getBoolean("prefs_filled_icons", false))
+    val filledIcons = _filledIcons.asStateFlow()
+
+    private val _customControlsColor = MutableStateFlow(prefs.getBoolean("prefs_custom_controls_color", false))
+    val customControlsColor = _customControlsColor.asStateFlow()
+
+    fun setAudioHiFi(value: Boolean) {
+        _audioHiFi.value = value
+        prefs.edit().putBoolean("prefs_audio_hifi", value).apply()
+    }
+
+    fun setCustomTitle(value: String) {
+        _customTitle.value = value
+        prefs.edit().putString("prefs_custom_title", value).apply()
+    }
+
+    fun setCustomSections(value: Boolean) {
+        _customSections.value = value
+        prefs.edit().putBoolean("prefs_custom_sections", value).apply()
+    }
+
+    fun setUseCustomColors(value: Boolean) {
+        _useCustomColors.value = value
+        prefs.edit().putBoolean("prefs_use_custom_colors", value).apply()
+    }
+
+    fun setSelectedCustomColor(value: Long) {
+        _selectedCustomColor.value = value
+        prefs.edit().putLong("prefs_selected_custom_color", value).apply()
+    }
+
+    fun setAmoledScreen(value: Boolean) {
+        _amoledScreen.value = value
+        prefs.edit().putBoolean("prefs_amoled_screen", value).apply()
+    }
+
+    fun setOpticalVibration(value: Boolean) {
+        _opticalVibration.value = value
+        prefs.edit().putBoolean("prefs_optical_vibration", value).apply()
+    }
+
+    fun setSongInfo(value: Boolean) {
+        _songInfo.value = value
+        prefs.edit().putBoolean("prefs_song_info", value).apply()
+    }
+
+    fun setCinematicPlayer(value: Boolean) {
+        _cinematicPlayer.value = value
+        prefs.edit().putBoolean("prefs_cinematic_player", value).apply()
+    }
+
+    fun setCoverShape(value: String) {
+        _coverShape.value = value
+        prefs.edit().putString("prefs_cover_shape", value).apply()
+    }
+
+    fun setCoverSize(value: String) {
+        _coverSize.value = value
+        prefs.edit().putString("prefs_cover_size", value).apply()
+    }
+
+    fun setButtonStyle(value: String) {
+        _buttonStyle.value = value
+        prefs.edit().putString("prefs_button_style", value).apply()
+    }
+
+    fun setFilledIcons(value: Boolean) {
+        _filledIcons.value = value
+        prefs.edit().putBoolean("prefs_filled_icons", value).apply()
+    }
+
+    fun setCustomControlsColor(value: Boolean) {
+        _customControlsColor.value = value
+        prefs.edit().putBoolean("prefs_custom_controls_color", value).apply()
+    }
+
     private val availableSongs = emptyList<Song>()
 
     private val _songsFlow = MutableStateFlow<List<Song>>(emptyList())
@@ -137,7 +252,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 scanFilesDirectly(file, depth + 1, result)
             } else {
                 val ext = file.extension.lowercase()
-                if (ext in listOf("mp3", "m4a", "wav", "ogg", "flac", "aac", "m4p", "mp4")) {
+                if (ext in listOf("mp3", "m4a", "wav", "ogg", "flac", "aac", "m4p")) {
                     result.add(file)
                 }
             }
@@ -188,7 +303,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                             val pathUriString = mediaUri.toString()
 
                             val extension = filePath.substringAfterLast('.', "").lowercase()
-                            val isSupported = filePath.isEmpty() || extension in listOf("mp3", "m4a", "wav", "ogg", "flac", "aac", "m4p", "mp4")
+                            val isSupported = filePath.isEmpty() || extension in listOf("mp3", "m4a", "wav", "ogg", "flac", "aac", "m4p")
 
                             if (isSupported && !seenIds.contains("ms_$id")) {
                                 seenIds.add("ms_$id")
@@ -249,8 +364,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                                     "${MediaStore.Files.FileColumns.DISPLAY_NAME} LIKE '%.m4a' OR " +
                                     "${MediaStore.Files.FileColumns.DISPLAY_NAME} LIKE '%.ogg' OR " +
                                     "${MediaStore.Files.FileColumns.DISPLAY_NAME} LIKE '%.flac' OR " +
-                                    "${MediaStore.Files.FileColumns.DISPLAY_NAME} LIKE '%.aac' OR " +
-                                    "${MediaStore.Files.FileColumns.DISPLAY_NAME} LIKE '%.mp4'"
+                                    "${MediaStore.Files.FileColumns.DISPLAY_NAME} LIKE '%.aac'"
 
                     val cursor = context.contentResolver.query(uri, projection, selection, null, null)
                     if (cursor != null) {

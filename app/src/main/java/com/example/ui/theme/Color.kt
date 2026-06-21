@@ -2,10 +2,10 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val DeepDark = Color(0xFF080808)
-val SurfaceDark = Color(0xFF121212)
-val CardDark = Color(0xFF0C0C0C)
-val ContainerDark = Color(0xFF1C1B1F)
+val DeepDark = Color(0xFF121212)
+val SurfaceDark = Color(0xFF1D1B20)
+val CardDark = Color(0xFF252525)
+val ContainerDark = Color(0xFF1D1B20)
 
 // Neon Accents from design HTML
 val NeonCyan = Color(0xFF00FFFF)
