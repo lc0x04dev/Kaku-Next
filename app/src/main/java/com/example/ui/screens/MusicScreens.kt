@@ -176,139 +176,141 @@ fun HomeScreen(
         }
 
         // Permission Card Block
-        item {
-            AnimatedContent(
-                targetState = hasPermission,
-                transitionSpec = {
-                    fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
-                },
-                label = "permission_banner"
-            ) { status ->
-                when (status) {
-                    true -> {
-                        // Permission already granted
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 24.dp)
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(
-                                    if (isScanning) Color(0xFF0F1A1E)
-                                    else if (songs.isEmpty()) Color(0xFF221910)
-                                    else Color(0xFF0F1E19)
-                                )
-                                .border(
-                                    1.dp,
-                                    if (isScanning) Color(0xFF00D2FF).copy(alpha = 0.5f)
-                                    else if (songs.isEmpty()) Color(0xFFFFB86C).copy(alpha = 0.5f)
-                                    else Color(0xFF00FF87).copy(alpha = 0.5f),
-                                    RoundedCornerShape(16.dp)
-                                )
-                                .padding(16.dp)
-                        ) {
-                            Column {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    if (isScanning) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(20.dp),
-                                            color = Color(0xFF00D2FF),
-                                            strokeWidth = 2.dp
-                                        )
-                                    } else if (songs.isEmpty()) {
-                                        Icon(
-                                            imageVector = Icons.Default.Info,
-                                            contentDescription = "Sincronización Completa",
-                                            tint = Color(0xFFFFB86C),
-                                            modifier = Modifier.size(24.dp)
-                                        )
-                                    } else {
-                                        Icon(
-                                            imageVector = Icons.Default.CheckCircle,
-                                            contentDescription = "Biblioteca Sincronizada",
-                                            tint = Color(0xFF00FF87),
-                                            modifier = Modifier.size(24.dp)
+        if (songs.isEmpty()) {
+            item {
+                AnimatedContent(
+                    targetState = hasPermission,
+                    transitionSpec = {
+                        fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
+                    },
+                    label = "permission_banner"
+                ) { status ->
+                    when (status) {
+                        true -> {
+                            // Permission already granted
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 24.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(
+                                        if (isScanning) Color(0xFF0F1A1E)
+                                        else if (songs.isEmpty()) Color(0xFF221910)
+                                        else Color(0xFF0F1E19)
+                                    )
+                                    .border(
+                                        1.dp,
+                                        if (isScanning) Color(0xFF00D2FF).copy(alpha = 0.5f)
+                                        else if (songs.isEmpty()) Color(0xFFFFB86C).copy(alpha = 0.5f)
+                                        else Color(0xFF00FF87).copy(alpha = 0.5f),
+                                        RoundedCornerShape(16.dp)
+                                    )
+                                    .padding(16.dp)
+                            ) {
+                                Column {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        if (isScanning) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(20.dp),
+                                                color = Color(0xFF00D2FF),
+                                                strokeWidth = 2.dp
+                                            )
+                                        } else if (songs.isEmpty()) {
+                                            Icon(
+                                                imageVector = Icons.Default.Info,
+                                                contentDescription = "Sincronización Completa",
+                                                tint = Color(0xFFFFB86C),
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                        } else {
+                                            Icon(
+                                                imageVector = Icons.Default.CheckCircle,
+                                                contentDescription = "Biblioteca Sincronizada",
+                                                tint = Color(0xFF00FF87),
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text(
+                                            text = if (isScanning) "Sincronizando música local..."
+                                                   else if (songs.isEmpty()) "Sincronización Completa"
+                                                   else "Biblioteca Sincronizada",
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp
                                         )
                                     }
-                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Spacer(modifier = Modifier.height(10.dp))
                                     Text(
-                                        text = if (isScanning) "Sincronizando música local..."
-                                               else if (songs.isEmpty()) "Sincronización Completa"
-                                               else "Biblioteca Sincronizada",
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp
+                                        text = if (isScanning) {
+                                            "Escaneando almacenamiento y buscando todo tipo de archivos de audio (MP3, M4A, WAV, FLAC, OGG, AAC)..."
+                                        } else if (songs.isEmpty()) {
+                                            "Kaku Next completó la búsqueda de todo tipo de archivos de audio (MP3, WAV, M4A, FLAC, OGG, AAC) en tu almacenamiento, pero no se ha detectado ninguna canción local en este momento. Intenta descargar música a tus carpetas públicas."
+                                        } else {
+                                            "Se han encontrado ${songs.size} canciones locales en tu dispositivo (MP3, WAV, M4A, FLAC, OGG, AAC) listas para reproducir con alta fidelidad."
+                                        },
+                                        color = if (isScanning) Color(0xFFB0D0FF)
+                                                else if (songs.isEmpty()) Color(0xFFFFDDBB)
+                                                else Color(0xFFB0C0B8),
+                                        fontSize = 12.sp,
+                                        lineHeight = 16.sp
                                     )
                                 }
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Text(
-                                    text = if (isScanning) {
-                                        "Escaneando almacenamiento y buscando todo tipo de archivos de audio (MP3, M4A, WAV, FLAC, OGG, AAC, MP4)..."
-                                    } else if (songs.isEmpty()) {
-                                        "Kaku Next completó la búsqueda de todo tipo de archivos de audio (MP3, WAV, M4A, FLAC, OGG, AAC) en tu almacenamiento, pero no se ha detectado ninguna canción local en este momento. Intenta descargar música a tus carpetas públicas."
-                                    } else {
-                                        "Se han encontrado ${songs.size} canciones locales en tu dispositivo (MP3, WAV, M4A, FLAC, OGG, AAC) listas para reproducir con alta fidelidad."
-                                    },
-                                    color = if (isScanning) Color(0xFFB0D0FF)
-                                            else if (songs.isEmpty()) Color(0xFFFFDDBB)
-                                            else Color(0xFFB0C0B8),
-                                    fontSize = 12.sp,
-                                    lineHeight = 16.sp
-                                )
                             }
                         }
-                    }
-                    else -> {
-                        // Not decided or false
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 24.dp)
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(MaterialTheme.colorScheme.primaryContainer)
-                                .border(1.dp, NeonCyan.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
-                                .padding(16.dp)
-                        ) {
-                            Column {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.FolderOpen,
-                                        contentDescription = "Almacenamiento",
-                                        tint = NeonCyan,
-                                        modifier = Modifier.size(32.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(12.dp))
+                        else -> {
+                            // Not decided or false
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 24.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(MaterialTheme.colorScheme.primaryContainer)
+                                    .border(1.dp, NeonCyan.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                                    .padding(16.dp)
+                            ) {
+                                Column {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.FolderOpen,
+                                            contentDescription = "Almacenamiento",
+                                            tint = NeonCyan,
+                                            modifier = Modifier.size(32.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text(
+                                            text = "Accede a tu música local",
+                                            color = TextWhite,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 16.sp
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(10.dp))
                                     Text(
-                                        text = "Accede a tu música local",
-                                        color = TextWhite,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 16.sp
+                                        text = "Para reproducir tus archivos locales de audio, Kaku Next necesita el permiso de lectura multimedia.",
+                                        color = TextGray,
+                                        fontSize = 13.sp,
+                                        lineHeight = 18.sp
                                     )
-                                }
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Text(
-                                    text = "Para reproducir tus archivos locales de audio, Kaku Next necesita el permiso de lectura multimedia.",
-                                    color = TextGray,
-                                    fontSize = 13.sp,
-                                    lineHeight = 18.sp
-                                )
-                                Spacer(modifier = Modifier.height(14.dp))
-                                Button(
-                                    onClick = { launcher.launch(permissionsToRequest) },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.primary,
-                                        contentColor = MaterialTheme.colorScheme.background
-                                    ),
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(44.dp)
-                                        .testTag("request_permission_button")
-                                ) {
-                                    Text(
-                                        text = "Conceder permiso",
-                                        fontWeight = FontWeight.Bold,
-                                        letterSpacing = 1.sp
-                                    )
+                                    Spacer(modifier = Modifier.height(14.dp))
+                                    Button(
+                                        onClick = { launcher.launch(permissionsToRequest) },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.primary,
+                                            contentColor = MaterialTheme.colorScheme.background
+                                        ),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(44.dp)
+                                            .testTag("request_permission_button")
+                                    ) {
+                                        Text(
+                                            text = "Conceder permiso",
+                                            fontWeight = FontWeight.Bold,
+                                            letterSpacing = 1.sp
+                                        )
+                                    }
                                 }
                             }
                         }

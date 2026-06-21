@@ -20,6 +20,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.Types
 
 class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -191,6 +193,60 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _isScanning = MutableStateFlow(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
 
+    private val moshi = Moshi.Builder()
+        .addLast(com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory())
+        .build()
+    private val songListAdapter = moshi.adapter<List<Song>>(Types.newParameterizedType(List::class.java, Song::class.java))
+
+    init {
+        try {
+            val cachedSongsJson = prefs.getString("cached_local_songs", null)
+            if (!cachedSongsJson.isNullOrEmpty()) {
+                val list = songListAdapter.fromJson(cachedSongsJson)
+                if (list != null && list.isNotEmpty()) {
+                    _songsFlow.value = list
+                    com.example.service.PlaybackManager.setPlaylist(list)
+                    _showSyncBanner.value = false
+                    
+                    _playlistsFlow.update {
+                        listOf(
+                            Playlist("local_1", "Descargas de Música", "Archivos de audio escaneados en tu dispositivo", list),
+                            Playlist("local_2", "Mezclas Recientes", "Canciones locales sugeridas", list.shuffled().take(list.size.coerceAtMost(5)))
+                        )
+                    }
+
+                    // Restaurar la última canción reproducida y su posición
+                    val lastSongId = prefs.getString("last_played_song_id", null)
+                    if (!lastSongId.isNullOrEmpty()) {
+                        val targetSong = list.find { it.id == lastSongId }
+                        if (targetSong != null) {
+                            val lastPosSec = prefs.getInt("last_played_position", 0)
+                            com.example.service.PlaybackManager.restoreSongAndPosition(targetSong, lastPosSec)
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        // Observar continuamente la canción actual y su progreso para guardarla de inmediato
+        viewModelScope.launch {
+            com.example.service.PlaybackManager.currentSong.collect { song ->
+                song?.let {
+                    prefs.edit().putString("last_played_song_id", it.id).apply()
+                }
+            }
+        }
+        viewModelScope.launch {
+            com.example.service.PlaybackManager.currentPosition.collect { position ->
+                if (com.example.service.PlaybackManager.currentSong.value != null) {
+                    prefs.edit().putInt("last_played_position", position).apply()
+                }
+            }
+        }
+    }
+
     private fun getAttributedContext(): Context {
         val app = getApplication<Application>()
         return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
@@ -259,6 +315,24 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         _hasStoragePermission.value = granted
     }
 
+    private fun isVideoFile(title: String, name: String, filePath: String, mimeType: String): Boolean {
+        val lowerTitle = title.lowercase()
+        val lowerName = name.lowercase()
+        val lowerPath = filePath.lowercase()
+        val lowerMime = mimeType.lowercase()
+
+        val videoExtensions = listOf("mp4", "mkv", "avi", "3gp", "webm", "mov", "flv", "m4v", "mpg", "mpeg", "wmv")
+        
+        if (lowerMime.contains("video") || lowerMime.startsWith("video/")) return true
+        
+        for (ext in videoExtensions) {
+            if (lowerPath.endsWith(".$ext") || lowerName.endsWith(".$ext") || lowerTitle.endsWith(".$ext")) {
+                return true
+            }
+        }
+        return false
+    }
+
     private fun scanFilesDirectly(dir: File, depth: Int, result: MutableList<File>) {
         if (depth > 12) return // depth limit to avoid stack overflow
         val list = try { dir.listFiles() } catch (e: Exception) { null } ?: return
@@ -276,6 +350,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 scanFilesDirectly(file, depth + 1, result)
             } else {
                 val ext = file.extension.lowercase()
+                if (ext in listOf("mp4", "mkv", "avi", "3gp", "webm", "mov", "flv", "m4v", "mpg", "mpeg", "wmv")) {
+                    continue
+                }
                 if (ext in listOf("mp3", "m4a", "wav", "ogg", "flac", "aac", "m4p")) {
                     result.add(file)
                 }
@@ -301,7 +378,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                         MediaStore.Audio.Media.ARTIST,
                         MediaStore.Audio.Media.ALBUM,
                         MediaStore.Audio.Media.DURATION,
-                        MediaStore.Audio.Media.DATA
+                        MediaStore.Audio.Media.DATA,
+                        "mime_type"
                     )
                     val cursor = context.contentResolver.query(uri, projection, selection, null, null)
                     if (cursor != null) {
@@ -311,6 +389,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                         val albumCol = cursor.getColumnIndex(MediaStore.Audio.Media.ALBUM)
                         val durationCol = cursor.getColumnIndex(MediaStore.Audio.Media.DURATION)
                         val dataCol = cursor.getColumnIndex(MediaStore.Audio.Media.DATA)
+                        val mimeCol = cursor.getColumnIndex("mime_type")
 
                         while (cursor.moveToNext()) {
                             val id = if (idCol >= 0) cursor.getLong(idCol).toString() else ""
@@ -321,6 +400,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                             val album = if (albumCol >= 0) cursor.getString(albumCol) ?: "Álbum Desconocido" else "Álbum Desconocido"
                             val durationMs = if (durationCol >= 0) cursor.getLong(durationCol) else 0L
                             val filePath = if (dataCol >= 0) cursor.getString(dataCol) ?: "" else ""
+                            val mimeType = if (mimeCol >= 0) cursor.getString(mimeCol) ?: "" else ""
 
                             // Generate the secure content URI for this media item
                             val mediaUri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id.toLong())
@@ -329,7 +409,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                             val extension = filePath.substringAfterLast('.', "").lowercase()
                             val isSupported = filePath.isEmpty() || extension in listOf("mp3", "m4a", "wav", "ogg", "flac", "aac", "m4p")
 
-                            if (isSupported && !seenIds.contains("ms_$id")) {
+                            val isVideo = isVideoFile(title, "", filePath, mimeType)
+
+                            if (isSupported && !isVideo && !seenIds.contains("ms_$id")) {
                                 seenIds.add("ms_$id")
                                 if (filePath.isNotEmpty()) {
                                     seenRawPaths.add(filePath.lowercase())
@@ -408,7 +490,17 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
                             val pathLower = filePath.lowercase()
                             val uniqueId = "fs_$id"
+                            val mimeType = if (mimeCol >= 0) cursor.getString(mimeCol) ?: "" else ""
+                            if (isVideoFile("", name, filePath, mimeType)) {
+                                continue
+                            }
                             if (seenIds.contains(uniqueId) || seenIds.contains("ms_$id") || (filePath.isNotEmpty() && seenRawPaths.contains(pathLower))) {
+                                continue
+                            }
+
+                            val extension = filePath.substringAfterLast('.', "").lowercase()
+                            // EXCLUDE MP4 AND OTHER VIDEO FORMATS DEFINITIVELY
+                            if (extension in listOf("mp4", "mkv", "avi", "3gp", "webm", "mov", "flv")) {
                                 continue
                             }
 
@@ -506,6 +598,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                         for (file in fileResults) {
                             val path = file.absolutePath
                             val pathLower = path.lowercase()
+                            if (isVideoFile("", file.name, path, "")) {
+                                continue
+                            }
                             if (!seenRawPaths.contains(pathLower)) {
                                 seenRawPaths.add(pathLower)
                                 var title = file.nameWithoutExtension
@@ -585,6 +680,14 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                             Playlist("local_1", "Descargas de Música", "Archivos de audio escaneados en tu dispositivo", songsList),
                             Playlist("local_2", "Mezclas Recientes", "Canciones locales sugeridas", songsList.shuffled().take(songsList.size.coerceAtMost(5)))
                         )
+                    }
+
+                    // Guardar canciones encontradas en caché
+                    try {
+                        val json = songListAdapter.toJson(songsList)
+                        prefs.edit().putString("cached_local_songs", json).apply()
+                    } catch (e: Exception) {
+                        e.printStackTrace()
                     }
                 }
             } catch (e: Exception) {

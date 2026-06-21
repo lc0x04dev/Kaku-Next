@@ -69,6 +69,14 @@ object PlaybackManager {
         mediaPlayer = null
     }
 
+    fun restoreSongAndPosition(song: Song, positionSeconds: Int) {
+        _currentSong.value = song
+        _currentPosition.value = positionSeconds
+        _isPlaying.value = false
+        mediaPlayer?.release()
+        mediaPlayer = null
+    }
+
     fun playSong(song: Song, list: List<Song>, context: Context) {
         _currentSong.value = song
         _playlist.value = list
