@@ -491,6 +491,18 @@ fun MainContainer(
                     navController = navController
                 )
             }
+            composable("estilo_barra_progreso") {
+                ProgressBarStyleScreen(
+                    viewModel = viewModel,
+                    navController = navController
+                )
+            }
+            composable("fondo_reproductor") {
+                PlayerBackgroundStyleScreen(
+                    viewModel = viewModel,
+                    navController = navController
+                )
+            }
         }
     }
 }

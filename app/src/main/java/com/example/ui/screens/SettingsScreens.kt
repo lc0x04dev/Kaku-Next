@@ -625,6 +625,8 @@ fun PersonalizationScreen(
     val opticalVibration by viewModel.opticalVibration.collectAsState()
     val songInfo by viewModel.songInfo.collectAsState()
     val cinematicPlayer by viewModel.cinematicPlayer.collectAsState()
+    val progressBarStyle by viewModel.progressBarStyle.collectAsState()
+    val playerBackgroundStyle by viewModel.playerBackgroundStyle.collectAsState()
 
     val NeonCyan = MaterialTheme.colorScheme.primary
     val DeepDark = MaterialTheme.colorScheme.background
@@ -1252,6 +1254,149 @@ fun PersonalizationScreen(
                             )
                             Text(
                                 text = "Personaliza los botones anterior y siguiente",
+                                color = TextGray,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // CATEGORY: ESTILO DEL REPRODUCTOR
+            item {
+                Text(
+                    text = "Estilo del reproductor",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextGray,
+                    letterSpacing = 0.5.sp,
+                    modifier = Modifier.padding(bottom = 6.dp, start = 4.dp)
+                )
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(cardColor)
+                        .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
+                ) {
+                    // Diseño del reproductor
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                Toast.makeText(context, "Diseño establecido a Nuevo diseño", Toast.LENGTH_SHORT).show()
+                            }
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.05f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Tv,
+                                contentDescription = null,
+                                tint = NeonCyan,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(
+                                text = "Diseño del reproductor",
+                                color = Color.White,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 15.sp
+                            )
+                            Text(
+                                text = "Nuevo diseño",
+                                color = TextGray,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.05f))
+
+                    // Estilo de barra de progreso
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { navController.navigate("estilo_barra_progreso") }
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.05f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.GraphicEq,
+                                contentDescription = null,
+                                tint = NeonCyan,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(
+                                text = "Estilo de barra de progreso",
+                                color = Color.White,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 15.sp
+                            )
+                            Text(
+                                text = progressBarStyle,
+                                color = TextGray,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.05f))
+
+                    // Estilo de fondo
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { navController.navigate("fondo_reproductor") }
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.05f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.GridView,
+                                contentDescription = null,
+                                tint = NeonCyan,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(
+                                text = "Estilo de fondo",
+                                color = Color.White,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 15.sp
+                            )
+                            Text(
+                                text = if (playerBackgroundStyle == "Apagado") "Apagado" else playerBackgroundStyle,
                                 color = TextGray,
                                 fontSize = 12.sp,
                                 modifier = Modifier.padding(top = 2.dp)
@@ -2017,5 +2162,648 @@ fun PlayerControlStyleScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+fun ProgressBarStyleScreen(
+    viewModel: MusicViewModel,
+    navController: NavController,
+    modifier: Modifier = Modifier
+) {
+    val haptic = LocalHapticFeedback.current
+    val isAmoled by viewModel.amoledScreen.collectAsState()
+    val opticalVibration by viewModel.opticalVibration.collectAsState()
+    val progressBarStyle by viewModel.progressBarStyle.collectAsState()
+
+    val bgThemeColor = MaterialTheme.colorScheme.background
+    val cardColor = MaterialTheme.colorScheme.primaryContainer
+    val NeonCyan = MaterialTheme.colorScheme.primary
+
+    val styles = listOf(
+        "Por defecto" to "Barra deslizadora estándar del sistema",
+        "Estilo 1" to "Barra plana sólida con indicador rectangular",
+        "Estilo 2" to "Burbuja elástica de onda siri",
+        "Estilo 3" to "Tubo de neón holográfico",
+        "Estilo 4" to "Onda sinusoidal continua",
+        "Barco de papel" to "Un barquito flotando sobre una onda pacífica",
+        "Estilo 6 (Nave OVNI)" to "Línea elegante con platillo volador OVNI"
+    )
+
+    Scaffold(
+        topBar = {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .height(64.dp)
+                    .background(bgThemeColor)
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = { navController.popBackStack() }) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Default.ArrowBack,
+                        contentDescription = "Volver",
+                        tint = Color.White
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Estilo de barra de progreso",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            }
+        },
+        containerColor = bgThemeColor,
+        modifier = modifier.fillMaxSize()
+    ) { innerPadding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(horizontal = 20.dp),
+            contentPadding = PaddingValues(top = 12.dp, bottom = 48.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            items(styles) { (styleName, styleDesc) ->
+                val isSelected = progressBarStyle == styleName
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(cardColor)
+                        .border(
+                            width = if (isSelected) 2.dp else 1.dp,
+                            color = if (isSelected) NeonCyan else Color.White.copy(alpha = 0.05f),
+                            shape = RoundedCornerShape(20.dp)
+                        )
+                        .clickable {
+                            if (opticalVibration) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            viewModel.setProgressBarStyle(styleName)
+                        }
+                        .padding(16.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = styleName,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                                Text(
+                                    text = styleDesc,
+                                    fontSize = 11.sp,
+                                    color = TextGray
+                                )
+                            }
+                            RadioButton(
+                                selected = isSelected,
+                                onClick = {
+                                    if (opticalVibration) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    viewModel.setProgressBarStyle(styleName)
+                                },
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = NeonCyan,
+                                    unselectedColor = TextGray
+                                )
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color.Black.copy(alpha = 0.2f))
+                                .padding(horizontal = 16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            ProgressBarStylesPreview(styleName = styleName)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ProgressBarStylesPreview(styleName: String) {
+    val infiniteTransition = rememberInfiniteTransition(label = "prog_preview")
+    val phase by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 2f * Math.PI.toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "phase"
+    )
+
+    Canvas(modifier = Modifier.fillMaxWidth().height(40.dp)) {
+        val width = size.width
+        val height = size.height
+        val centerY = height / 2f
+        val activeWidth = width * 0.6f
+
+        when (styleName) {
+            "Por defecto" -> {
+                drawLine(
+                    color = Color.White.copy(alpha = 0.1f),
+                    start = androidx.compose.ui.geometry.Offset(0f, centerY),
+                    end = androidx.compose.ui.geometry.Offset(width, centerY),
+                    strokeWidth = 4.dp.toPx(),
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                )
+                drawLine(
+                    color = Color(0xFF00E5FF),
+                    start = androidx.compose.ui.geometry.Offset(0f, centerY),
+                    end = androidx.compose.ui.geometry.Offset(activeWidth, centerY),
+                    strokeWidth = 4.dp.toPx(),
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                )
+                drawCircle(
+                    color = Color(0xFF00E5FF),
+                    center = androidx.compose.ui.geometry.Offset(activeWidth, centerY),
+                    radius = 8.dp.toPx()
+                )
+            }
+            "Estilo 1" -> {
+                drawLine(
+                    color = Color.White.copy(alpha = 0.1f),
+                    start = androidx.compose.ui.geometry.Offset(0f, centerY),
+                    end = androidx.compose.ui.geometry.Offset(width, centerY),
+                    strokeWidth = 6.dp.toPx()
+                )
+                drawLine(
+                    color = Color(0xFFFF5722),
+                    start = androidx.compose.ui.geometry.Offset(0f, centerY),
+                    end = androidx.compose.ui.geometry.Offset(activeWidth, centerY),
+                    strokeWidth = 6.dp.toPx()
+                )
+                drawRect(
+                    color = Color.White,
+                    topLeft = androidx.compose.ui.geometry.Offset(activeWidth - 4.dp.toPx(), centerY - 8.dp.toPx()),
+                    size = androidx.compose.ui.geometry.Size(8.dp.toPx(), 16.dp.toPx())
+                )
+            }
+            "Estilo 2" -> {
+                val path = androidx.compose.ui.graphics.Path()
+                path.moveTo(0f, centerY)
+                for (x in 0..width.toInt()) {
+                    val progressRatio = x / width
+                    val envelope = if (progressRatio < 0.6f) {
+                        progressRatio / 0.6f
+                    } else {
+                        (1f - progressRatio) / 0.4f
+                    }
+                    val y = centerY + Math.sin(x * 0.05 + phase).toFloat() * 10.dp.toPx() * envelope
+                    path.lineTo(x.toFloat(), y)
+                }
+                drawPath(
+                    path = path,
+                    color = Color(0xFF8A2BE2),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+                )
+                drawCircle(
+                    color = Color.White,
+                    center = androidx.compose.ui.geometry.Offset(activeWidth, centerY),
+                    radius = 6.dp.toPx()
+                )
+            }
+            "Estilo 3" -> {
+                drawLine(
+                    color = Color.White.copy(alpha = 0.08f),
+                    start = androidx.compose.ui.geometry.Offset(0f, centerY),
+                    end = androidx.compose.ui.geometry.Offset(width, centerY),
+                    strokeWidth = 8.dp.toPx(),
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                )
+                drawLine(
+                    color = Color(0xFF00FFCC),
+                    start = androidx.compose.ui.geometry.Offset(0f, centerY),
+                    end = androidx.compose.ui.geometry.Offset(activeWidth, centerY),
+                    strokeWidth = 8.dp.toPx(),
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                )
+                drawLine(
+                    color = Color.White,
+                    start = androidx.compose.ui.geometry.Offset(0f, centerY),
+                    end = androidx.compose.ui.geometry.Offset(activeWidth, centerY),
+                    strokeWidth = 2.dp.toPx(),
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                )
+            }
+            "Estilo 4" -> {
+                val path = androidx.compose.ui.graphics.Path()
+                path.moveTo(0f, centerY)
+                for (x in 0..width.toInt()) {
+                    var y = centerY
+                    if (x < activeWidth) {
+                        y = centerY + Math.sin(x * 0.04 - phase).toFloat() * 6.dp.toPx()
+                    }
+                    path.lineTo(x.toFloat(), y)
+                }
+                drawPath(
+                    path = path,
+                    color = Color(0xFFFF5722).copy(alpha = 0.4f),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                )
+
+                val activePath = androidx.compose.ui.graphics.Path()
+                activePath.moveTo(0f, centerY)
+                for (x in 0..activeWidth.toInt()) {
+                    val y = centerY + Math.sin(x * 0.04 - phase).toFloat() * 6.dp.toPx()
+                    activePath.lineTo(x.toFloat(), y)
+                }
+                drawPath(
+                    path = activePath,
+                    color = Color(0xFFFF5722),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                )
+                drawCircle(
+                    color = Color.White,
+                    center = androidx.compose.ui.geometry.Offset(activeWidth, centerY + Math.sin(activeWidth * 0.04 - phase).toFloat() * 6.dp.toPx()),
+                    radius = 6.dp.toPx()
+                )
+            }
+            "Barco de papel" -> {
+                val path = androidx.compose.ui.graphics.Path()
+                path.moveTo(0f, centerY)
+                for (x in 0..width.toInt()) {
+                    val y = centerY + 3.dp.toPx() + Math.sin(x * 0.03 + phase).toFloat() * 5.dp.toPx()
+                    path.lineTo(x.toFloat(), y)
+                }
+                drawPath(
+                    path = path,
+                    color = Color.White.copy(alpha = 0.15f),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+                )
+
+                val activePath = androidx.compose.ui.graphics.Path()
+                activePath.moveTo(0f, centerY)
+                for (x in 0..activeWidth.toInt()) {
+                    val y = centerY + 3.dp.toPx() + Math.sin(x * 0.03 + phase).toFloat() * 5.dp.toPx()
+                    activePath.lineTo(x.toFloat(), y)
+                }
+                drawPath(
+                    path = activePath,
+                    color = Color(0xFF00E5FF),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+                )
+
+                val boatY = centerY + 3.dp.toPx() + Math.sin(activeWidth * 0.03 + phase).toFloat() * 5.dp.toPx()
+                val boatPath = androidx.compose.ui.graphics.Path()
+                boatPath.moveTo(activeWidth - 10.dp.toPx(), boatY)
+                boatPath.lineTo(activeWidth - 6.dp.toPx(), boatY + 4.dp.toPx())
+                boatPath.lineTo(activeWidth + 6.dp.toPx(), boatY + 4.dp.toPx())
+                boatPath.lineTo(activeWidth + 10.dp.toPx(), boatY)
+                boatPath.lineTo(activeWidth, boatY - 6.dp.toPx())
+                boatPath.close()
+
+                drawPath(path = boatPath, color = Color.White)
+            }
+            "Estilo 6 (Nave OVNI)" -> {
+                drawLine(
+                    color = Color.White.copy(alpha = 0.15f),
+                    start = androidx.compose.ui.geometry.Offset(0f, centerY),
+                    end = androidx.compose.ui.geometry.Offset(width, centerY),
+                    strokeWidth = 6.dp.toPx(),
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                )
+                drawLine(
+                    color = Color(0xFFFF5722),
+                    start = androidx.compose.ui.geometry.Offset(0f, centerY),
+                    end = androidx.compose.ui.geometry.Offset(activeWidth, centerY),
+                    strokeWidth = 6.dp.toPx(),
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                )
+
+                val ufoHover = Math.sin(phase.toDouble()).toFloat() * 3.dp.toPx()
+                val ufoX = activeWidth
+                val ufoY = centerY - 14.dp.toPx() + ufoHover
+
+                val beamPath = androidx.compose.ui.graphics.Path()
+                beamPath.moveTo(ufoX - 4.dp.toPx(), ufoY + 2.dp.toPx())
+                beamPath.lineTo(ufoX - 12.dp.toPx(), centerY)
+                beamPath.lineTo(ufoX + 12.dp.toPx(), centerY)
+                beamPath.lineTo(ufoX + 4.dp.toPx(), ufoY + 2.dp.toPx())
+                beamPath.close()
+                drawPath(path = beamPath, color = Color(0xFF00FFCC).copy(alpha = 0.25f))
+
+                drawOval(
+                    color = Color(0xFF78909C),
+                    topLeft = androidx.compose.ui.geometry.Offset(ufoX - 12.dp.toPx(), ufoY - 2.dp.toPx()),
+                    size = androidx.compose.ui.geometry.Size(24.dp.toPx(), 6.dp.toPx())
+                )
+                drawOval(
+                    color = Color(0xFFE0F7FA),
+                    topLeft = androidx.compose.ui.geometry.Offset(ufoX - 6.dp.toPx(), ufoY - 6.dp.toPx()),
+                    size = androidx.compose.ui.geometry.Size(12.dp.toPx(), 6.dp.toPx())
+                )
+                drawCircle(
+                    color = Color(0xFF00FFCC),
+                    center = androidx.compose.ui.geometry.Offset(ufoX, ufoY + 1.dp.toPx()),
+                    radius = 2.dp.toPx()
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun PlayerBackgroundStyleScreen(
+    viewModel: MusicViewModel,
+    navController: NavController,
+    modifier: Modifier = Modifier
+) {
+    val haptic = LocalHapticFeedback.current
+    val isAmoled by viewModel.amoledScreen.collectAsState()
+    val opticalVibration by viewModel.opticalVibration.collectAsState()
+    val playerBackgroundStyle by viewModel.playerBackgroundStyle.collectAsState()
+    val playerBackgroundPreset by viewModel.playerBackgroundPreset.collectAsState()
+
+    val bgThemeColor = MaterialTheme.colorScheme.background
+    val cardColor = MaterialTheme.colorScheme.primaryContainer
+    val NeonCyan = MaterialTheme.colorScheme.primary
+
+    val options = listOf(
+        "Apagado" to "Pure theme color",
+        "Static Colors" to "Minimalist background",
+        "Fondo animado" to "Se adapta a la reproducción de música"
+    )
+
+    Scaffold(
+        topBar = {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .height(64.dp)
+                    .background(bgThemeColor)
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = { navController.popBackStack() }) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Default.ArrowBack,
+                        contentDescription = "Volver",
+                        tint = Color.White
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Fondo del reproductor",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            }
+        },
+        containerColor = bgThemeColor,
+        modifier = modifier.fillMaxSize()
+    ) { innerPadding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(horizontal = 20.dp),
+            contentPadding = PaddingValues(top = 12.dp, bottom = 48.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(cardColor)
+                        .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(20.dp))
+                ) {
+                    options.forEachIndexed { index, (styleName, styleDesc) ->
+                        val isSelected = playerBackgroundStyle == styleName
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    if (opticalVibration) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    viewModel.setPlayerBackgroundStyle(styleName)
+                                }
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = styleName,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color.White
+                                )
+                                Text(
+                                    text = styleDesc,
+                                    fontSize = 11.sp,
+                                    color = TextGray
+                                )
+                            }
+                            RadioButton(
+                                selected = isSelected,
+                                onClick = {
+                                    if (opticalVibration) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    viewModel.setPlayerBackgroundStyle(styleName)
+                                },
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = NeonCyan,
+                                    unselectedColor = TextGray
+                                )
+                            )
+                        }
+                        if (index < options.size - 1) {
+                            HorizontalDivider(color = Color.White.copy(alpha = 0.05f))
+                        }
+                    }
+                }
+            }
+
+            item {
+                Text(
+                    text = "Ajustes predefinidos",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    modifier = Modifier.padding(top = 8.dp, start = 4.dp)
+                )
+            }
+
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        PresetBackgroundCard(
+                            name = "Programar 1",
+                            modifier = Modifier.weight(1f),
+                            selectedPreset = playerBackgroundPreset,
+                            onClick = {
+                                if (opticalVibration) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                viewModel.setPlayerBackgroundPreset("Programar 1")
+                                viewModel.setPlayerBackgroundStyle("Static Colors")
+                            }
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Brush.verticalGradient(listOf(Color(0xFF0F2027), Color(0xFF203A43), Color(0xFF2C5364))))
+                            )
+                        }
+
+                        PresetBackgroundCard(
+                            name = "Programar 2",
+                            modifier = Modifier.weight(1f),
+                            selectedPreset = playerBackgroundPreset,
+                            onClick = {
+                                if (opticalVibration) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                viewModel.setPlayerBackgroundPreset("Programar 2")
+                                viewModel.setPlayerBackgroundStyle("Static Colors")
+                            }
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Brush.verticalGradient(listOf(Color(0xFF3A6073), Color(0xFF16222F))))
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        PresetBackgroundCard(
+                            name = "Gradiente 3",
+                            modifier = Modifier.weight(1f),
+                            selectedPreset = playerBackgroundPreset,
+                            onClick = {
+                                if (opticalVibration) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                viewModel.setPlayerBackgroundPreset("Gradiente 3")
+                                viewModel.setPlayerBackgroundStyle("Static Colors")
+                            }
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Brush.verticalGradient(listOf(Color(0xFF2D1B4E), Color(0xFF160E2A))))
+                            )
+                        }
+
+                        PresetBackgroundCard(
+                            name = "Fondo Paisaje",
+                            modifier = Modifier.weight(1f),
+                            selectedPreset = playerBackgroundPreset,
+                            onClick = {
+                                if (opticalVibration) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                viewModel.setPlayerBackgroundPreset("Fondo Paisaje")
+                                viewModel.setPlayerBackgroundStyle("Static Colors")
+                            }
+                        ) {
+                            Canvas(modifier = Modifier.fillMaxSize()) {
+                                drawRect(color = Color(0xFF1A237E))
+                                drawCircle(color = Color.White.copy(alpha = 0.5f), center = androidx.compose.ui.geometry.Offset(20.dp.toPx(), 20.dp.toPx()), radius = 1.dp.toPx())
+                                drawCircle(color = Color.White.copy(alpha = 0.8f), center = androidx.compose.ui.geometry.Offset(80.dp.toPx(), 40.dp.toPx()), radius = 1.5.dp.toPx())
+                                drawCircle(color = Color.White.copy(alpha = 0.4f), center = androidx.compose.ui.geometry.Offset(130.dp.toPx(), 25.dp.toPx()), radius = 1.dp.toPx())
+                                
+                                drawCircle(color = Color(0xFFFFF59D), center = androidx.compose.ui.geometry.Offset(45.dp.toPx(), 35.dp.toPx()), radius = 10.dp.toPx())
+                                drawCircle(color = Color(0xFF1A237E), center = androidx.compose.ui.geometry.Offset(39.dp.toPx(), 35.dp.toPx()), radius = 10.dp.toPx())
+
+                                val mount1 = androidx.compose.ui.graphics.Path()
+                                mount1.moveTo(0f, size.height)
+                                mount1.lineTo(size.width * 0.3f, size.height * 0.4f)
+                                mount1.lineTo(size.width * 0.7f, size.height * 0.7f)
+                                mount1.lineTo(size.width, size.height * 0.3f)
+                                mount1.lineTo(size.width, size.height)
+                                mount1.close()
+                                drawPath(path = mount1, color = Color(0xFF283593))
+
+                                val mount2 = androidx.compose.ui.graphics.Path()
+                                mount2.moveTo(0f, size.height)
+                                mount2.lineTo(size.width * 0.5f, size.height * 0.55f)
+                                mount2.lineTo(size.width, size.height * 0.45f)
+                                mount2.lineTo(size.width, size.height)
+                                mount2.close()
+                                drawPath(path = mount2, color = Color(0xFF303F9F))
+
+                                drawRect(
+                                    color = Color(0xFF1E2746).copy(alpha = 0.9f),
+                                    topLeft = androidx.compose.ui.geometry.Offset(0f, size.height * 0.82f),
+                                    size = androidx.compose.ui.geometry.Size(size.width, size.height * 0.18f)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PresetBackgroundCard(
+    name: String,
+    modifier: Modifier = Modifier,
+    selectedPreset: String,
+    onClick: () -> Unit,
+    content: @Composable BoxScope.() -> Unit
+) {
+    val isSelected = selectedPreset == name
+    Column(
+        modifier = modifier.clickable { onClick() },
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(0.6f)
+                .clip(RoundedCornerShape(16.dp))
+                .border(
+                    width = if (isSelected) 3.dp else 1.dp,
+                    color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.05f),
+                    shape = RoundedCornerShape(16.dp)
+                )
+        ) {
+            content()
+            if (isSelected) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Selected",
+                        tint = MaterialTheme.colorScheme.background,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = name,
+            color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 12.sp
+        )
     }
 }

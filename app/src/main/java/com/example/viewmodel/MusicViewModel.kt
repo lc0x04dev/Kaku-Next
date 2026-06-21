@@ -68,6 +68,15 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _customControlsColor = MutableStateFlow(prefs.getBoolean("prefs_custom_controls_color", false))
     val customControlsColor = _customControlsColor.asStateFlow()
 
+    private val _progressBarStyle = MutableStateFlow(prefs.getString("prefs_progress_bar_style", "Por defecto") ?: "Por defecto")
+    val progressBarStyle = _progressBarStyle.asStateFlow()
+
+    private val _playerBackgroundStyle = MutableStateFlow(prefs.getString("prefs_player_background_style", "Apagado") ?: "Apagado")
+    val playerBackgroundStyle = _playerBackgroundStyle.asStateFlow()
+
+    private val _playerBackgroundPreset = MutableStateFlow(prefs.getString("prefs_player_background_preset", "Gradiente 3") ?: "Gradiente 3")
+    val playerBackgroundPreset = _playerBackgroundPreset.asStateFlow()
+
     fun setAudioHiFi(value: Boolean) {
         _audioHiFi.value = value
         prefs.edit().putBoolean("prefs_audio_hifi", value).apply()
@@ -136,6 +145,21 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun setCustomControlsColor(value: Boolean) {
         _customControlsColor.value = value
         prefs.edit().putBoolean("prefs_custom_controls_color", value).apply()
+    }
+
+    fun setProgressBarStyle(value: String) {
+        _progressBarStyle.value = value
+        prefs.edit().putString("prefs_progress_bar_style", value).apply()
+    }
+
+    fun setPlayerBackgroundStyle(value: String) {
+        _playerBackgroundStyle.value = value
+        prefs.edit().putString("prefs_player_background_style", value).apply()
+    }
+
+    fun setPlayerBackgroundPreset(value: String) {
+        _playerBackgroundPreset.value = value
+        prefs.edit().putString("prefs_player_background_preset", value).apply()
     }
 
     private val availableSongs = emptyList<Song>()
