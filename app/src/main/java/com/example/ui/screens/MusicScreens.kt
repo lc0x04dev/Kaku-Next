@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -63,6 +64,59 @@ fun formatTime(seconds: Int): String {
     val mins = seconds / 60
     val secs = seconds % 60
     return String.format("%01d:%02d", mins, secs)
+}
+
+data class SyncedLyricLine(
+    val timeSeconds: Int,
+    val text: String
+)
+
+fun parseLrc(lyricsText: String): List<SyncedLyricLine> {
+    if (lyricsText.isBlank()) return emptyList()
+    val lines = lyricsText.split("\n")
+    val parsedList = mutableListOf<SyncedLyricLine>()
+    // Pattern matches typical LRC formats: [00:12.34], [00:12:34], [00:12], etc.
+    val timeRegex = Regex("""\[(\d{2}):(\d{2})(?:[.:](\d{2,3}))?\]""")
+    
+    for (line in lines) {
+        val trimmed = line.trim()
+        if (trimmed.isEmpty()) continue
+        
+        val matchResults = timeRegex.findAll(trimmed).toList()
+        if (matchResults.isNotEmpty()) {
+            var cleanText = trimmed
+            for (match in matchResults) {
+                cleanText = cleanText.replace(match.value, "")
+            }
+            cleanText = cleanText.trim()
+            
+            for (match in matchResults) {
+                val min = match.groupValues[1].toIntOrNull() ?: 0
+                val sec = match.groupValues[2].toIntOrNull() ?: 0
+                val timeSec = min * 60 + sec
+                parsedList.add(SyncedLyricLine(timeSeconds = timeSec, text = cleanText))
+            }
+        } else {
+            // Check if it's metadata (like [by:someone] or [ti:Title]) - if so, don't include it as raw text
+            if (trimmed.startsWith("[") && trimmed.contains(":") && trimmed.endsWith("]")) {
+                // Ignore metadata lines
+            } else {
+                // If it is just plain text, keep it with -1 timestamp
+                parsedList.add(SyncedLyricLine(timeSeconds = -1, text = trimmed))
+            }
+        }
+    }
+    
+    val syncedLines = parsedList.filter { it.timeSeconds >= 0 }.sortedBy { it.timeSeconds }
+    if (syncedLines.isNotEmpty()) {
+        return syncedLines
+    } else {
+        // If there are no synced lines at all, treat every line as plain text with 4 sec interval
+        return lines.mapIndexed { idx, rawLine ->
+            val trimmed = rawLine.trim()
+            SyncedLyricLine(timeSeconds = idx * 4, text = trimmed)
+        }
+    }
 }
 
 @Composable
@@ -831,23 +885,52 @@ fun PlayerScreen(
                             }
 
                             if (!song.lyrics.isNullOrBlank()) {
+                                val parsedLyrics = remember(song.lyrics) { parseLrc(song.lyrics) }
+                                val activeLineIndex = remember(parsedLyrics, currentPosition) {
+                                    val index = parsedLyrics.indexOfLast { it.timeSeconds <= currentPosition }
+                                    if (index == -1 && parsedLyrics.isNotEmpty()) 0 else index
+                                }
+                                val listState = rememberLazyListState()
+                                
+                                LaunchedEffect(activeLineIndex) {
+                                    if (activeLineIndex >= 0 && activeLineIndex < parsedLyrics.size) {
+                                        listState.animateScrollToItem(index = activeLineIndex, scrollOffset = -250)
+                                    }
+                                }
                                 LazyColumn(
+                                    state = listState,
                                     modifier = Modifier.weight(1f).fillMaxWidth(),
-                                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
+                                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    contentPadding = PaddingValues(vertical = 40.dp)
                                 ) {
-                                    items(song.lyrics.split("\n")) { line ->
-                                        val lineClean = line.trim()
-                                        if (lineClean.isNotEmpty()) {
-                                            // Match line containing '[' or ']' or styled specially
-                                            val isHighlighted = lineClean.contains("[") || lineClean.contains("]") || lineClean.contains("código") || lineClean.contains("silencio")
+                                    itemsIndexed(parsedLyrics) { index, line ->
+                                        val isActive = index == activeLineIndex
+                                        val haptic = LocalHapticFeedback.current
+                                        val textColor = if (isActive) accentColor else Color.White.copy(alpha = 0.5f)
+                                        val fontSize = if (isActive) 19.sp else 15.sp
+                                        val fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Medium
+                                        
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .clickable {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                    if (line.timeSeconds >= 0) {
+                                                        viewModel.seekTo(line.timeSeconds)
+                                                    }
+                                                }
+                                                .padding(vertical = 4.dp, horizontal = 8.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
                                             Text(
-                                                text = lineClean.replace("[", "").replace("]", ""),
-                                                color = if (isHighlighted) Color.White else TextGray,
-                                                fontSize = if (isHighlighted) 17.sp else 14.sp,
-                                                fontWeight = if (isHighlighted) FontWeight.Bold else FontWeight.Medium,
+                                                text = line.text,
+                                                color = textColor,
+                                                fontSize = fontSize,
+                                                fontWeight = fontWeight,
                                                 textAlign = TextAlign.Center,
-                                                lineHeight = if (isHighlighted) 22.sp else 19.sp,
+                                                lineHeight = if (isActive) 24.sp else 20.sp,
                                                 modifier = Modifier.fillMaxWidth()
                                             )
                                         }

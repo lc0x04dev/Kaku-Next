@@ -336,11 +336,14 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun findLocalLyrics(physicalPath: String?): String? {
         if (physicalPath.isNullOrEmpty()) return null
+        val context = getApplication<Application>()
         try {
+            // Approach 1: Java File API (Direct local check)
             val file = File(physicalPath)
-            if (file.exists()) {
-                val parent = file.parentFile
-                val baseName = file.nameWithoutExtension
+            val parent = file.parentFile
+            val baseName = file.nameWithoutExtension
+            
+            if (parent != null && parent.exists()) {
                 val candidates = listOf(
                     "$baseName.lrc", "$baseName.txt",
                     "$baseName.LRC", "$baseName.TXT"
@@ -348,13 +351,56 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 for (candidate in candidates) {
                     val f = File(parent, candidate)
                     if (f.exists()) {
-                        return f.readText()
+                        try {
+                            val content = f.readText()
+                            if (content.isNotBlank()) {
+                                return content
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
                     }
                 }
             }
         } catch (e: Exception) {
             e.printStackTrace()
         }
+
+        // Approach 2: MediaStore.Files Query Fallback (Fully supports Android 11+ Scoped Storage!)
+        try {
+            val file = File(physicalPath)
+            val baseName = file.nameWithoutExtension
+            if (baseName.isNotEmpty()) {
+                val uri = MediaStore.Files.getContentUri("external")
+                val projection = arrayOf(MediaStore.Files.FileColumns._ID)
+                
+                val selection = "${MediaStore.Files.FileColumns.DISPLAY_NAME} = ? OR " +
+                                "${MediaStore.Files.FileColumns.DISPLAY_NAME} = ? OR " +
+                                "${MediaStore.Files.FileColumns.DISPLAY_NAME} = ? OR " +
+                                "${MediaStore.Files.FileColumns.DISPLAY_NAME} = ?"
+                val selectionArgs = arrayOf(
+                    "$baseName.lrc", "$baseName.LRC",
+                    "$baseName.txt", "$baseName.TXT"
+                )
+                
+                context.contentResolver.query(uri, projection, selection, selectionArgs, null)?.use { cursor ->
+                    val idCol = cursor.getColumnIndex(MediaStore.Files.FileColumns._ID)
+                    if (cursor.moveToFirst() && idCol >= 0) {
+                        val rowId = cursor.getLong(idCol)
+                        val lrcUri = ContentUris.withAppendedId(MediaStore.Files.getContentUri("external"), rowId)
+                        context.contentResolver.openInputStream(lrcUri)?.use { inputStream ->
+                            val content = inputStream.bufferedReader().use { it.readText() }
+                            if (content.isNotBlank()) {
+                                return content
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        
         return null
     }
 
