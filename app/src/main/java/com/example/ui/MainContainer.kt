@@ -411,7 +411,10 @@ fun MainContainer(
             composable("player") {
                 PlayerScreen(
                     viewModel = viewModel,
-                    modifier = Modifier.padding(innerPadding)
+                    modifier = Modifier.padding(innerPadding),
+                    onQueueClick = {
+                        navController.navigate("queue")
+                    }
                 )
             }
             composable("songs") {
@@ -501,6 +504,13 @@ fun MainContainer(
                 PlayerBackgroundStyleScreen(
                     viewModel = viewModel,
                     navController = navController
+                )
+            }
+            composable("queue") {
+                QueueScreen(
+                    viewModel = viewModel,
+                    navController = navController,
+                    modifier = Modifier.padding(innerPadding)
                 )
             }
         }

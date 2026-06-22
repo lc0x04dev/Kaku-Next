@@ -173,6 +173,25 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val currentSong: StateFlow<Song?> = com.example.service.PlaybackManager.currentSong
     val isPlaying: StateFlow<Boolean> = com.example.service.PlaybackManager.isPlaying
     val currentPosition: StateFlow<Int> = com.example.service.PlaybackManager.currentPosition
+    val playbackQueue: StateFlow<List<Song>> = com.example.service.PlaybackManager.playlist
+
+    fun removeSongFromQueue(songId: String) {
+        val currentList = com.example.service.PlaybackManager.playlist.value.toMutableList()
+        val index = currentList.indexOfFirst { it.id == songId }
+        if (index >= 0) {
+            currentList.removeAt(index)
+            com.example.service.PlaybackManager.updatePlaylist(currentList)
+        }
+    }
+
+    fun reorderQueue(fromIndex: Int, toIndex: Int) {
+        val currentList = com.example.service.PlaybackManager.playlist.value.toMutableList()
+        if (fromIndex in currentList.indices && toIndex in currentList.indices) {
+            val song = currentList.removeAt(fromIndex)
+            currentList.add(toIndex, song)
+            com.example.service.PlaybackManager.updatePlaylist(currentList)
+        }
+    }
 
     // Playlist States
     private val _playlistsFlow = MutableStateFlow<List<Playlist>>(emptyList())
@@ -315,6 +334,30 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         _hasStoragePermission.value = granted
     }
 
+    private fun findLocalLyrics(physicalPath: String?): String? {
+        if (physicalPath.isNullOrEmpty()) return null
+        try {
+            val file = File(physicalPath)
+            if (file.exists()) {
+                val parent = file.parentFile
+                val baseName = file.nameWithoutExtension
+                val candidates = listOf(
+                    "$baseName.lrc", "$baseName.txt",
+                    "$baseName.LRC", "$baseName.TXT"
+                )
+                for (candidate in candidates) {
+                    val f = File(parent, candidate)
+                    if (f.exists()) {
+                        return f.readText()
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return null
+    }
+
     private fun isVideoFile(title: String, name: String, filePath: String, mimeType: String): Boolean {
         val lowerTitle = title.lowercase()
         val lowerName = name.lowercase()
@@ -441,9 +484,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                                         album = album,
                                         duration = durationStr,
                                         durationSeconds = if (durationSecs > 0) durationSecs else 180,
-                                        lyrics = localLyrics,
+                                        lyrics = findLocalLyrics(filePath) ?: localLyrics,
                                         coverColor = pickedColor,
-                                        filePath = pathUriString
+                                        filePath = pathUriString,
+                                        physicalPath = filePath
                                     )
                                 )
                             }
@@ -559,9 +603,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                                     album = album,
                                     duration = durationStr,
                                     durationSeconds = durationSeconds,
-                                    lyrics = localLyrics,
+                                    lyrics = findLocalLyrics(filePath) ?: localLyrics,
                                     coverColor = pickedColor,
-                                    filePath = pathUriString
+                                    filePath = pathUriString,
+                                    physicalPath = filePath
                                 )
                             )
                         }

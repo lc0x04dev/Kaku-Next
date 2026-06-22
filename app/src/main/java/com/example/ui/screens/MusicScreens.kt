@@ -17,6 +17,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -541,7 +542,8 @@ fun EqualizerIcon(color: Color) {
 @Composable
 fun PlayerScreen(
     viewModel: MusicViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onQueueClick: () -> Unit = {}
 ) {
     val currentSong by viewModel.currentSong.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
@@ -549,6 +551,12 @@ fun PlayerScreen(
     val progressBarStyle by viewModel.progressBarStyle.collectAsState()
     val playerBackgroundStyle by viewModel.playerBackgroundStyle.collectAsState()
     val playerBackgroundPreset by viewModel.playerBackgroundPreset.collectAsState()
+
+    val coverShape by viewModel.coverShape.collectAsState()
+    val coverSize by viewModel.coverSize.collectAsState()
+    val buttonStyle by viewModel.buttonStyle.collectAsState()
+    val filledIcons by viewModel.filledIcons.collectAsState()
+    val customControlsColor by viewModel.customControlsColor.collectAsState()
 
     if (currentSong == null) {
         Box(
@@ -716,9 +724,20 @@ fun PlayerScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     // Atmospheric glowing vinyl/album art cover (Immersive design spec)
+                    val finalPercent = when (coverSize) {
+                        "70%" -> 0.7f
+                        "85%" -> 0.85f
+                        else -> 1.0f
+                    }
+                    val artworkShapeComp = when (coverShape) {
+                        "Cuadrada" -> RoundedCornerShape(0.dp)
+                        "Circular" -> CircleShape
+                        else -> SquircleStarShape
+                    }
+
                     Box(
                         modifier = Modifier
-                            .size(240.dp)
+                            .size(240.dp * finalPercent)
                             .padding(4.dp),
                         contentAlignment = Alignment.Center
                     ) {
@@ -726,7 +745,7 @@ fun PlayerScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .clip(RoundedCornerShape(24.dp))
+                                .clip(artworkShapeComp)
                                 .background(
                                     Brush.linearGradient(
                                         colors = listOf(
@@ -743,29 +762,29 @@ fun PlayerScreen(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(8.dp)
-                                .clip(RoundedCornerShape(24.dp))
+                                .clip(artworkShapeComp)
                                 .background(MaterialTheme.colorScheme.surface)
-                                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(24.dp)),
+                                .border(1.dp, Color.White.copy(alpha = 0.1f), artworkShapeComp),
                             contentAlignment = Alignment.Center
                         ) {
                             // Inner card disc frame
                             Box(
                                 modifier = Modifier
-                                    .size(150.dp)
-                                    .clip(RoundedCornerShape(20.dp))
+                                    .size(150.dp * finalPercent)
+                                    .clip(artworkShapeComp)
                                     .background(
                                         Brush.linearGradient(
                                             colors = listOf(Color(0xFF1C1C1C), Color(0xFF0C0C0C))
                                         )
                                     )
-                                    .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(20.dp)),
+                                    .border(1.dp, Color.White.copy(alpha = 0.05f), artworkShapeComp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.MusicNote,
                                     contentDescription = "Music Note",
                                     tint = accentColor.copy(alpha = 0.5f),
-                                    modifier = Modifier.size(64.dp)
+                                    modifier = Modifier.size(64.dp * finalPercent)
                                 )
                             }
                         }
@@ -945,7 +964,10 @@ fun PlayerScreen(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Controls (Forward, Backward, Play/Pause, Favorite)
+        // Controls (Forward, Backward, Play/Pause, Favorite, Queue)
+        val buttonTint = if (customControlsColor) accentColor else TextWhite
+        val favoriteBorderIcon = if (filledIcons) Icons.Default.Favorite else Icons.Default.FavoriteBorder
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -959,9 +981,9 @@ fun PlayerScreen(
                 modifier = Modifier.size(48.dp)
             ) {
                 Icon(
-                    imageVector = if (song.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    imageVector = if (song.isFavorite) Icons.Default.Favorite else favoriteBorderIcon,
                     contentDescription = "Favorito",
-                    tint = if (song.isFavorite) NeonMagenta else TextWhite,
+                    tint = if (song.isFavorite) NeonMagenta else buttonTint,
                     modifier = Modifier.size(26.dp)
                 )
             }
@@ -976,31 +998,76 @@ fun PlayerScreen(
                 Icon(
                     imageVector = Icons.Default.SkipPrevious,
                     contentDescription = "Anterior",
-                    tint = TextWhite,
+                    tint = buttonTint,
                     modifier = Modifier.size(36.dp)
                 )
             }
 
-            // Floating Play / Pause Large Neon Button
-            Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(accentColor, NeonMagenta)
+            // Central Play / Pause Button with custom styles
+            val playPauseIcon = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow
+            when (buttonStyle) {
+                "Play 2" -> {
+                    // "Play 2" -> RoundedCornerShape(16.dp), solid filled background
+                    val btnBg = if (customControlsColor) accentColor else Color.White
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(btnBg)
+                            .clickable(onClick = { viewModel.togglePlayPause() })
+                            .testTag("play_pause_button"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = playPauseIcon,
+                            contentDescription = if (isPlaying) "Pausar" else "Reproducir",
+                            tint = DeepDark,
+                            modifier = Modifier.size(32.dp)
                         )
-                    )
-                    .clickable(onClick = { viewModel.togglePlayPause() })
-                    .testTag("play_pause_button"),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (isPlaying) "Pausar" else "Reproducir",
-                    tint = DeepDark,
-                    modifier = Modifier.size(32.dp)
-                )
+                    }
+                }
+                "Play 3" -> {
+                    // "Play 3" -> Circle outline with transparent background
+                    val btnOutlineColor = if (customControlsColor) accentColor else Color.White
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .border(2.dp, btnOutlineColor, CircleShape)
+                            .clickable(onClick = { viewModel.togglePlayPause() })
+                            .testTag("play_pause_button"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = playPauseIcon,
+                            contentDescription = if (isPlaying) "Pausar" else "Reproducir",
+                            tint = btnOutlineColor,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                }
+                else -> {
+                    // "Por defecto" -> Circle filled gradient
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.linearGradient(
+                                    colors = if (customControlsColor) listOf(accentColor, accentColor.copy(alpha = 0.7f)) else listOf(accentColor, NeonMagenta)
+                                )
+                            )
+                            .clickable(onClick = { viewModel.togglePlayPause() })
+                            .testTag("play_pause_button"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = playPauseIcon,
+                            contentDescription = if (isPlaying) "Pausar" else "Reproducir",
+                            tint = DeepDark,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                }
             }
 
             // Skip Next
@@ -1013,20 +1080,20 @@ fun PlayerScreen(
                 Icon(
                     imageVector = Icons.Default.SkipNext,
                     contentDescription = "Siguiente",
-                    tint = TextWhite,
+                    tint = buttonTint,
                     modifier = Modifier.size(36.dp)
                 )
             }
 
-            // Queue/Equalizer Icon decorative
+            // Queue Screen Navigation Button (Fully Functional!)
             IconButton(
-                onClick = {},
+                onClick = { onQueueClick() },
                 modifier = Modifier.size(48.dp)
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Default.PlaylistPlay,
                     contentDescription = "Cola",
-                    tint = TextWhite,
+                    tint = buttonTint,
                     modifier = Modifier.size(26.dp)
                 )
             }
@@ -1571,10 +1638,11 @@ fun CustomInteractiveSlider(
         val widthPx = constraints.maxWidth.toFloat()
         val rangeLen = valueRange.endInclusive - valueRange.start
         val progress = if (rangeLen > 0) (value - valueRange.start) / rangeLen else 0f
-        val currentProgress = progress.coerceIn(0f, 1f)
-
+        
         val haptic = LocalHapticFeedback.current
         var isDragging by remember { mutableStateOf(false) }
+        var dragProgress by remember { mutableStateOf<Float?>(null) }
+        val currentProgress = dragProgress ?: progress.coerceIn(0f, 1f)
 
         val interactionModifier = Modifier.pointerInput(widthPx, rangeLen) {
             detectTapGestures(
@@ -1586,16 +1654,30 @@ fun CustomInteractiveSlider(
             )
         }.pointerInput(widthPx, rangeLen) {
             detectHorizontalDragGestures(
-                onDragStart = { isDragging = true },
-                onDragEnd = { isDragging = false },
-                onDragCancel = { isDragging = false },
+                onDragStart = { 
+                    isDragging = true
+                    dragProgress = progress.coerceIn(0f, 1f)
+                },
+                onDragEnd = { 
+                    isDragging = false
+                    dragProgress?.let { p ->
+                        val newValue = valueRange.start + p * rangeLen
+                        onValueChange(newValue)
+                    }
+                    dragProgress = null
+                },
+                onDragCancel = { 
+                    isDragging = false
+                    dragProgress = null
+                },
                 onHorizontalDrag = { change, dragAmount ->
                     change.consume()
-                    val currentPx = currentProgress * widthPx
-                    val nextPx = (currentPx + dragAmount).coerceIn(0f, widthPx)
-                    val nextProgress = nextPx / widthPx
-                    val newValue = valueRange.start + nextProgress * rangeLen
-                    onValueChange(newValue)
+                    dragProgress?.let { currentP ->
+                        val nextProgress = (currentP + dragAmount / widthPx).coerceIn(0f, 1f)
+                        dragProgress = nextProgress
+                        val newValue = valueRange.start + nextProgress * rangeLen
+                        onValueChange(newValue)
+                    }
                 }
             )
         }
@@ -1610,6 +1692,8 @@ fun CustomInteractiveSlider(
             ),
             label = "phase"
         )
+
+        val primaryColorStyle = MaterialTheme.colorScheme.primary
 
         Canvas(modifier = Modifier.fillMaxSize().then(interactionModifier)) {
             val width = size.width
@@ -1640,6 +1724,9 @@ fun CustomInteractiveSlider(
                     )
                 }
                 "Estilo 2" -> {
+                    val activeColor = Color(0xFF8A2BE2)
+                    
+                    // Inactive wave path (lower amplitude & transparency)
                     val path = androidx.compose.ui.graphics.Path()
                     path.moveTo(0f, centerY)
                     for (x in 0..width.toInt()) {
@@ -1649,17 +1736,41 @@ fun CustomInteractiveSlider(
                         } else {
                             (1f - progressRatio) / ((1f - currentProgress).coerceAtLeast(0.01f))
                         }
-                        val y = centerY + Math.sin(x * 0.05 + phase).toFloat() * 10.dp.toPx() * envelope
+                        val y = centerY + Math.sin(x * 0.05 + phase).toFloat() * 8.dp.toPx() * envelope
                         path.lineTo(x.toFloat(), y)
                     }
                     drawPath(
                         path = path,
-                        color = Color(0xFF8A2BE2),
+                        color = activeColor.copy(alpha = 0.2f),
                         style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
                     )
+
+                    // Active wave path on top (full opacity, thicker stroke)
+                    val activePath = androidx.compose.ui.graphics.Path()
+                    activePath.moveTo(0f, centerY)
+                    for (x in 0..activeWidth.toInt()) {
+                        val progressRatio = x / width
+                        val envelope = if (progressRatio < currentProgress) {
+                            progressRatio / (currentProgress.coerceAtLeast(0.01f))
+                        } else {
+                            (1f - progressRatio) / ((1f - currentProgress).coerceAtLeast(0.01f))
+                        }
+                        val y = centerY + Math.sin(x * 0.05 + phase).toFloat() * 8.dp.toPx() * envelope
+                        activePath.lineTo(x.toFloat(), y)
+                    }
+                    drawPath(
+                        path = activePath,
+                        color = activeColor,
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 4.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                    )
+
+                    // Thumb on wave
+                    val thumbRatio = currentProgress
+                    val thumbEnvelope = thumbRatio * (1f - thumbRatio) * 4f
+                    val thumbY = centerY + Math.sin(activeWidth * 0.05 + phase).toFloat() * 8.dp.toPx() * thumbEnvelope
                     drawCircle(
                         color = Color.White,
-                        center = androidx.compose.ui.geometry.Offset(activeWidth, centerY),
+                        center = androidx.compose.ui.geometry.Offset(activeWidth, thumbY),
                         radius = 6.dp.toPx()
                     )
                 }
@@ -1687,21 +1798,22 @@ fun CustomInteractiveSlider(
                     )
                 }
                 "Estilo 4" -> {
+                    val activeColor = primaryColorStyle
+                    
+                    // Background continuous wave
                     val path = androidx.compose.ui.graphics.Path()
                     path.moveTo(0f, centerY)
                     for (x in 0..width.toInt()) {
-                        var y = centerY
-                        if (x < activeWidth) {
-                            y = centerY + Math.sin(x * 0.04 - phase).toFloat() * 6.dp.toPx()
-                        }
+                        val y = centerY + Math.sin(x * 0.04 - phase).toFloat() * 6.dp.toPx()
                         path.lineTo(x.toFloat(), y)
                     }
                     drawPath(
                         path = path,
-                        color = Color(0xFFFF5722).copy(alpha = 0.4f),
-                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                        color = activeColor.copy(alpha = 0.15f),
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
                     )
 
+                    // Active wave on top
                     val activePath = androidx.compose.ui.graphics.Path()
                     activePath.moveTo(0f, centerY)
                     for (x in 0..activeWidth.toInt()) {
@@ -1710,9 +1822,11 @@ fun CustomInteractiveSlider(
                     }
                     drawPath(
                         path = activePath,
-                        color = Color(0xFFFF5722),
-                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                        color = activeColor,
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 4.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
                     )
+
+                    // Moving thumb centered on the wave
                     drawCircle(
                         color = Color.White,
                         center = androidx.compose.ui.geometry.Offset(activeWidth, centerY + Math.sin(activeWidth * 0.04 - phase).toFloat() * 6.dp.toPx()),
@@ -1798,6 +1912,227 @@ fun CustomInteractiveSlider(
                         center = androidx.compose.ui.geometry.Offset(ufoX, ufoY + 1.dp.toPx()),
                         radius = 2.dp.toPx()
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun QueueScreen(
+    viewModel: MusicViewModel,
+    navController: NavController,
+    modifier: Modifier = Modifier
+) {
+    val playbackQueue by viewModel.playbackQueue.collectAsState()
+    val currentSong by viewModel.currentSong.collectAsState()
+    val isPlaying by viewModel.isPlaying.collectAsState()
+    val haptic = LocalHapticFeedback.current
+
+    val amoled by viewModel.amoledScreen.collectAsState()
+    val useCustomColors by viewModel.useCustomColors.collectAsState()
+    val selectedCustomColor by viewModel.selectedCustomColor.collectAsState()
+    val accentColor = if (useCustomColors) Color(selectedCustomColor) else NeonCyan
+
+    val bgThemeColor = MaterialTheme.colorScheme.background
+
+    Scaffold(
+        topBar = {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .height(64.dp)
+                    .background(bgThemeColor)
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = { navController.popBackStack() }) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Volver",
+                        tint = Color.White
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Column {
+                    Text(
+                        text = "Cola de reproducción",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Text(
+                        text = "${playbackQueue.size} canciones",
+                        fontSize = 12.sp,
+                        color = TextGray
+                    )
+                }
+            }
+        },
+        containerColor = bgThemeColor,
+        modifier = modifier.fillMaxSize()
+    ) { innerPadding ->
+        if (playbackQueue.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "No hay canciones en la cola",
+                    color = TextGray,
+                    fontSize = 14.sp
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(horizontal = 16.dp),
+                contentPadding = PaddingValues(top = 12.dp, bottom = 48.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                itemsIndexed(playbackQueue) { index, song ->
+                    val isCurrent = currentSong?.id == song.id
+                    val songColor = Color(song.coverColor)
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(if (isCurrent) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface.copy(alpha = 0.5f))
+                            .border(
+                                width = 1.dp,
+                                color = if (isCurrent) accentColor.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.03f),
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                            .clickable {
+                                viewModel.selectSong(song)
+                            }
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        // Left Section: Play/Indicator + Title/Artist
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(songColor.copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isCurrent && isPlaying) {
+                                    // Mini active sound waves
+                                    Icon(
+                                        imageVector = Icons.Default.VolumeUp,
+                                        contentDescription = "Reproduciendo",
+                                        tint = accentColor,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.MusicNote,
+                                        contentDescription = null,
+                                        tint = songColor,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Column {
+                                Text(
+                                    text = song.title,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isCurrent) accentColor else Color.White,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = song.artist,
+                                    fontSize = 12.sp,
+                                    color = TextGray,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+
+                        // Right Section: Up/Down Swap buttons (Reorder Capability!) & Delete
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            // Duration Label
+                            Text(
+                                text = song.duration,
+                                fontSize = 11.sp,
+                                color = TextMuted,
+                                modifier = Modifier.padding(end = 8.dp)
+                            )
+
+                            // Move Up Button
+                            if (index > 0) {
+                                IconButton(
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        viewModel.reorderQueue(index, index - 1)
+                                    },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.KeyboardArrowUp,
+                                        contentDescription = "Mover arriba",
+                                        tint = TextGray,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+
+                            // Move Down Button
+                            if (index < playbackQueue.size - 1) {
+                                IconButton(
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        viewModel.reorderQueue(index, index + 1)
+                                    },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.KeyboardArrowDown,
+                                        contentDescription = "Mover abajo",
+                                        tint = TextGray,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+
+                            // Delete/Remove from Queue Button (Functional deletion!)
+                            IconButton(
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    viewModel.removeSongFromQueue(song.id)
+                                },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = "Eliminar de la cola",
+                                    tint = Color.Red.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }

@@ -13,5 +13,6 @@ data class Song(
     val lyrics: String?,
     val coverColor: Long, // Color Hex (e.g. 0xFF00F0FF) for ambient styling
     val isFavorite: Boolean = false,
-    val filePath: String? = null
+    val filePath: String? = null,
+    val physicalPath: String? = null
 )
