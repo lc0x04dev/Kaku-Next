@@ -19,6 +19,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.launch
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
@@ -174,6 +177,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val isPlaying: StateFlow<Boolean> = com.example.service.PlaybackManager.isPlaying
     val currentPosition: StateFlow<Int> = com.example.service.PlaybackManager.currentPosition
     val playbackQueue: StateFlow<List<Song>> = com.example.service.PlaybackManager.playlist
+    val currentQualityDetails: StateFlow<com.example.service.AudioQualityDetails?> = com.example.service.PlaybackManager.currentQualityDetails
 
     fun removeSongFromQueue(songId: String) {
         val currentList = com.example.service.PlaybackManager.playlist.value.toMutableList()
@@ -197,6 +201,42 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _playlistsFlow = MutableStateFlow<List<Playlist>>(emptyList())
     val playlistsFlow: StateFlow<List<Playlist>> = _playlistsFlow.asStateFlow()
 
+    fun getSongFolderName(song: Song): String {
+        val path = song.physicalPath ?: song.filePath ?: ""
+        if (path.isNotEmpty()) {
+            val normalizedPath = path.replace("\\", "/")
+            val parts = normalizedPath.split("/")
+            if (parts.size > 1) {
+                val folderName = parts[parts.size - 2]
+                if (folderName.isNotEmpty() && folderName != "0" && folderName != "emulated") {
+                    return folderName
+                }
+            }
+        }
+        if (song.album.isNotEmpty() && song.album != "Álbum Desconocido" && song.album != "Unknown Album") {
+            return song.album
+        }
+        if (song.filePath?.lowercase()?.contains("download") == true || song.physicalPath?.lowercase()?.contains("download") == true) {
+            return "Download"
+        }
+        return "Mp3"
+    }
+
+    val foldersFlow: StateFlow<List<FolderInfo>> = _songsFlow.map { songs ->
+        val activeSongs = songs
+        val groups = activeSongs.groupBy { getSongFolderName(it) }
+        groups.map { (name, songList) ->
+            val parentPath = songList.firstOrNull()?.physicalPath?.let {
+                File(it).parent ?: ""
+            } ?: songList.firstOrNull()?.filePath?.let {
+                val normalized = it.replace("\\", "/")
+                val idx = normalized.lastIndexOf("/")
+                if (idx != -1) normalized.substring(0, idx) else ""
+            } ?: ""
+            FolderInfo(name, parentPath, songList)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     // Search query state
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
@@ -219,31 +259,62 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         try {
-            val cachedSongsJson = prefs.getString("cached_local_songs", null)
-            if (!cachedSongsJson.isNullOrEmpty()) {
-                val list = songListAdapter.fromJson(cachedSongsJson)
-                if (list != null && list.isNotEmpty()) {
-                    _songsFlow.value = list
-                    com.example.service.PlaybackManager.setPlaylist(list)
-                    _showSyncBanner.value = false
-                    
-                    _playlistsFlow.update {
-                        listOf(
-                            Playlist("local_1", "Descargas de Música", "Archivos de audio escaneados en tu dispositivo", list),
-                            Playlist("local_2", "Mezclas Recientes", "Canciones locales sugeridas", list.shuffled().take(list.size.coerceAtMost(5)))
-                        )
-                    }
+            val context = application.applicationContext
+            val permissionGranted = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                androidx.core.content.ContextCompat.checkSelfPermission(
+                    context,
+                    android.Manifest.permission.READ_MEDIA_AUDIO
+                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            } else {
+                androidx.core.content.ContextCompat.checkSelfPermission(
+                    context,
+                    android.Manifest.permission.READ_EXTERNAL_STORAGE
+                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            }
 
-                    // Restaurar la última canción reproducida y su posición
-                    val lastSongId = prefs.getString("last_played_song_id", null)
-                    if (!lastSongId.isNullOrEmpty()) {
-                        val targetSong = list.find { it.id == lastSongId }
-                        if (targetSong != null) {
-                            val lastPosSec = prefs.getInt("last_played_position", 0)
-                            com.example.service.PlaybackManager.restoreSongAndPosition(targetSong, lastPosSec)
+            if (permissionGranted) {
+                val cachedSongsJson = prefs.getString("cached_local_songs", null)
+                if (!cachedSongsJson.isNullOrEmpty()) {
+                    val list = songListAdapter.fromJson(cachedSongsJson)
+                    if (list != null && list.isNotEmpty()) {
+                        _songsFlow.value = list
+                        com.example.service.PlaybackManager.setPlaylist(list)
+                        _showSyncBanner.value = false
+                        
+                        _playlistsFlow.update {
+                            listOf(
+                                Playlist("local_1", "Descargas de Música", "Archivos de audio escaneados en tu dispositivo", list),
+                                Playlist("local_2", "Mezclas Recientes", "Canciones locales sugeridas", list.shuffled().take(list.size.coerceAtMost(5)))
+                            )
                         }
+
+                        // Restaurar la última canción reproducida y su posición
+                        val lastSongId = prefs.getString("last_played_song_id", null)
+                        if (!lastSongId.isNullOrEmpty()) {
+                            val targetSong = list.find { it.id == lastSongId }
+                            if (targetSong != null) {
+                                val lastPosSec = prefs.getInt("last_played_position", 0)
+                                com.example.service.PlaybackManager.restoreSongAndPosition(targetSong, lastPosSec)
+                            }
+                        }
+                    } else {
+                        _songsFlow.value = emptyList()
+                        com.example.service.PlaybackManager.setPlaylist(emptyList())
+                        _showSyncBanner.value = true
+                        _playlistsFlow.update { emptyList() }
                     }
+                } else {
+                    _songsFlow.value = emptyList()
+                    com.example.service.PlaybackManager.setPlaylist(emptyList())
+                    _showSyncBanner.value = true
+                    _playlistsFlow.update { emptyList() }
                 }
+            } else {
+                _songsFlow.value = emptyList()
+                com.example.service.PlaybackManager.setPlaylist(emptyList())
+                _showSyncBanner.value = true
+                _playlistsFlow.update { emptyList() }
+                com.example.service.PlaybackManager.reset()
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -332,6 +403,13 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setPermissionStatus(granted: Boolean) {
         _hasStoragePermission.value = granted
+        if (!granted) {
+            _songsFlow.value = emptyList()
+            com.example.service.PlaybackManager.setPlaylist(emptyList())
+            _playlistsFlow.update { emptyList() }
+            _showSyncBanner.value = true
+            com.example.service.PlaybackManager.reset()
+        }
     }
 
     private fun findLocalLyrics(physicalPath: String?): String? {
@@ -401,6 +479,16 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             e.printStackTrace()
         }
         
+        // Approach 3: Extract Embedded Lyrics (SYLT, USLT, ©lyr) directly from the audio file!
+        try {
+            val embeddedLyrics = com.example.service.LyricsExtractor.extractLyrics(context, physicalPath)
+            if (!embeddedLyrics.isNullOrBlank()) {
+                return embeddedLyrics
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        
         return null
     }
 
@@ -453,11 +541,12 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _isScanning.value = true
             try {
-                val songsList = mutableListOf<Song>()
-                val seenRawPaths = mutableSetOf<String>()
-                val seenIds = mutableSetOf<String>()
+                val songsList = withContext(Dispatchers.IO) {
+                    val songsList = mutableListOf<Song>()
+                    val seenRawPaths = mutableSetOf<String>()
+                    val seenIds = mutableSetOf<String>()
 
-                // 1. Scan via MediaStore Audio Media
+                    // 1. Scan via MediaStore Audio Media
                 try {
                     val uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
                     val selection = null 
@@ -664,100 +753,99 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 // 3. Scan via Direct Filesystem (Fallback for older storage setups)
-                withContext(Dispatchers.IO) {
-                    try {
-                        val fileResults = mutableListOf<File>()
-                        val roots = listOfNotNull(
-                            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-                            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC),
-                            File(Environment.getExternalStorageDirectory(), "Download"),
-                            File(Environment.getExternalStorageDirectory(), "Music"),
-                            File("/sdcard/Download"),
-                            File("/sdcard/Music"),
-                            File("/storage/emulated/0/Download"),
-                            File("/storage/emulated/0/Music")
-                        )
+                try {
+                    val fileResults = mutableListOf<File>()
+                    val roots = listOfNotNull(
+                        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC),
+                        File(Environment.getExternalStorageDirectory(), "Download"),
+                        File(Environment.getExternalStorageDirectory(), "Music"),
+                        File("/sdcard/Download"),
+                        File("/sdcard/Music"),
+                        File("/storage/emulated/0/Download"),
+                        File("/storage/emulated/0/Music")
+                    )
 
-                        for (root in roots.distinctBy { it.absolutePath }) {
-                            if (root.exists() && root.isDirectory) {
-                                scanFilesDirectly(root, 0, fileResults)
-                            }
+                    for (root in roots.distinctBy { it.absolutePath }) {
+                        if (root.exists() && root.isDirectory) {
+                            scanFilesDirectly(root, 0, fileResults)
                         }
-
-                        // Process found files
-                        val retriever = MediaMetadataRetriever()
-                        for (file in fileResults) {
-                            val path = file.absolutePath
-                            val pathLower = path.lowercase()
-                            if (isVideoFile("", file.name, path, "")) {
-                                continue
-                            }
-                            if (!seenRawPaths.contains(pathLower)) {
-                                seenRawPaths.add(pathLower)
-                                var title = file.nameWithoutExtension
-                                var artist = "Artista Desconocido"
-                                var album = "Álbum Desconocido"
-                                var durationSeconds = 180
-
-                                try {
-                                    retriever.setDataSource(path)
-                                    val rTitle = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
-                                    val rArtist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
-                                    val rAlbum = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM)
-                                    val rDurationMs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
-
-                                    if (!rTitle.isNullOrBlank()) title = rTitle
-                                    if (!rArtist.isNullOrBlank()) artist = rArtist
-                                    if (!rAlbum.isNullOrBlank()) album = rAlbum
-                                    if (rDurationMs != null && rDurationMs > 0) {
-                                        durationSeconds = (rDurationMs / 1000).toInt()
-                                    }
-                                } catch (e: Exception) {
-                                    // ignore and use fallback values
-                                }
-
-                                val mins = durationSeconds / 60
-                                val secs = durationSeconds % 60
-                                val durationStr = String.format("%01d:%02d", mins, secs)
-
-                                val localLyrics = """
-                                    [00:00] Reproduciendo tu archivo local (Escaneado Directo)
-                                    [00:08] Canción: $title
-                                    [00:15] Artista: $artist
-                                    [00:22] Sintonizando el pulso de tu código analógico
-                                    [00:30] Sonando con fidelidad premium en Kaku Next
-                                """.trimIndent()
-
-                                val colors = listOf(0xFF00F0FF, 0xFFFF007F, 0xFFBD93F9, 0xFF4EFE80, 0xFFFFB86C, 0xFFF1FA8C)
-                                val colorIdx = path.hashCode().coerceAtLeast(0) % colors.size
-                                val pickedColor = colors[colorIdx]
-
-                                val id = "fs_direct_" + path.hashCode()
-
-                                withContext(Dispatchers.Main) {
-                                    songsList.add(
-                                        Song(
-                                            id = id,
-                                            title = title,
-                                            artist = artist,
-                                            album = album,
-                                            duration = durationStr,
-                                            durationSeconds = durationSeconds,
-                                            lyrics = localLyrics,
-                                            coverColor = pickedColor,
-                                            filePath = path
-                                        )
-                                    )
-                                }
-                            }
-                        }
-                        try { retriever.release() } catch (e: Exception) { }
-                    } catch (e: Exception) {
-                        e.printStackTrace()
                     }
+
+                    // Process found files
+                    val retriever = MediaMetadataRetriever()
+                    for (file in fileResults) {
+                        val path = file.absolutePath
+                        val pathLower = path.lowercase()
+                        if (isVideoFile("", file.name, path, "")) {
+                            continue
+                        }
+                        if (!seenRawPaths.contains(pathLower)) {
+                            seenRawPaths.add(pathLower)
+                            var title = file.nameWithoutExtension
+                            var artist = "Artista Desconocido"
+                            var album = "Álbum Desconocido"
+                            var durationSeconds = 180
+
+                            try {
+                                retriever.setDataSource(path)
+                                val rTitle = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
+                                val rArtist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
+                                val rAlbum = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM)
+                                val rDurationMs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+
+                                if (!rTitle.isNullOrBlank()) title = rTitle
+                                if (!rArtist.isNullOrBlank()) artist = rArtist
+                                if (!rAlbum.isNullOrBlank()) album = rAlbum
+                                if (rDurationMs != null && rDurationMs > 0) {
+                                    durationSeconds = (rDurationMs / 1000).toInt()
+                                }
+                            } catch (e: Exception) {
+                                // ignore and use fallback values
+                            }
+
+                            val mins = durationSeconds / 60
+                            val secs = durationSeconds % 60
+                            val durationStr = String.format("%01d:%02d", mins, secs)
+
+                            val localLyrics = """
+                                [00:00] Reproduciendo tu archivo local (Escaneado Directo)
+                                [00:08] Canción: $title
+                                [00:15] Artista: $artist
+                                [00:22] Sintonizando el pulso de tu código analógico
+                                [00:30] Sonando con fidelidad premium en Kaku Next
+                            """.trimIndent()
+
+                            val colors = listOf(0xFF00F0FF, 0xFFFF007F, 0xFFBD93F9, 0xFF4EFE80, 0xFFFFB86C, 0xFFF1FA8C)
+                            val colorIdx = path.hashCode().coerceAtLeast(0) % colors.size
+                            val pickedColor = colors[colorIdx]
+
+                            val id = "fs_direct_" + path.hashCode()
+
+                            songsList.add(
+                                Song(
+                                    id = id,
+                                    title = title,
+                                    artist = artist,
+                                    album = album,
+                                    duration = durationStr,
+                                    durationSeconds = durationSeconds,
+                                    lyrics = localLyrics,
+                                    coverColor = pickedColor,
+                                    filePath = path
+                                )
+                            )
+                        }
+                    }
+                    try { retriever.release() } catch (e: Exception) { }
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
 
-                // Update flows on main thread
+                songsList
+            }
+
+            // Update flows on main thread
                 if (songsList.isNotEmpty()) {
                     _songsFlow.value = songsList
                     com.example.service.PlaybackManager.setPlaylist(songsList)
@@ -798,5 +886,11 @@ data class Playlist(
     val id: String,
     val name: String,
     val description: String,
+    val songs: List<Song>
+)
+
+data class FolderInfo(
+    val name: String,
+    val path: String,
     val songs: List<Song>
 )

@@ -14,8 +14,8 @@ android {
     applicationId = "com.aistudio.kakunext.kmyrsv"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = 257
+    versionName = "2.7.8-dev.1-test"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

@@ -408,29 +408,18 @@ fun SettingsScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    // App Logo Simulation
+                    // App Logo Real Asset (Wavy Badge)
                     Box(
                         modifier = Modifier
-                            .size(72.dp)
-                            .clip(CircleShape)
-                            .background(Brush.linearGradient(colors = listOf(NeonCyan, NeonMagenta)))
-                            .padding(2.dp),
+                            .size(100.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(CircleShape)
-                                .background(bgThemeColor),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "KN",
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Black,
-                                color = NeonCyan
-                            )
-                        }
+                        androidx.compose.foundation.Image(
+                            painter = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.ic_kaku_logo_light),
+                            contentDescription = "Logo Kaku Next",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Fit
+                        )
                     }
                     
                     Spacer(modifier = Modifier.height(16.dp))
@@ -441,7 +430,7 @@ fun SettingsScreen(
                         fontSize = 20.sp
                     )
                     Text(
-                        text = "Versión v3.4.2",
+                        text = "Versión v2.7.8-dev.1-test",
                         color = TextGray,
                         fontSize = 12.sp,
                         fontFamily = FontFamily.Monospace,

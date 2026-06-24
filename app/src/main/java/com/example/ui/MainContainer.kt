@@ -55,8 +55,9 @@ fun MainContainer(
     val bottomBarBgColor = if (isAmoled) Color.Black else ContainerDark
 
     // Define standard main routes that show bottom and top bars
-    val mainRoutes = listOf("home", "songs", "playlists", "search")
+    val mainRoutes = listOf("home", "songs", "playlists", "search", "player")
     val isMainRoute = currentRoute in mainRoutes
+    val showTopBar = isMainRoute && currentRoute != "player"
 
     // Control visibility of MiniPlayer: active song, but NOT on full Player screen and ONLY on main routes
     val showMiniPlayer = currentSong != null && currentRoute != "player" && isMainRoute
@@ -64,7 +65,7 @@ fun MainContainer(
     Scaffold(
         topBar = {
             // Immersive Top Header (shows ONLY on main routes so settings/player have full bleed)
-            if (isMainRoute) {
+            if (showTopBar) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -95,34 +96,18 @@ fun MainContainer(
                     // Clicking that badge opens the Configuración (Settings) screen as requested!
                     Box(
                         modifier = Modifier
-                            .size(38.dp)
-                            .clip(CircleShape)
-                            .background(
-                                Brush.linearGradient(
-                                    colors = if (useCustomColors) listOf(accentColor, accentColor) else listOf(NeonCyan, NeonMagenta)
-                                )
-                            )
+                            .size(42.dp)
                             .clickable {
                                 navController.navigate("settings")
-                            }
-                            .padding(2.dp)
+                            },
+                        contentAlignment = Alignment.Center
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(CircleShape)
-                                .background(bgThemeColor),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = if (customTitle.isNotEmpty()) customTitle.take(2).uppercase() else "KN",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Black,
-                                color = accentColor,
-                                letterSpacing = (-1).sp,
-                                fontFamily = FontFamily.Monospace
-                            )
-                        }
+                        androidx.compose.foundation.Image(
+                            painter = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.ic_kaku_logo_light),
+                            contentDescription = "Logo Kaku Next",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Fit
+                        )
                     }
                 }
             }
@@ -284,7 +269,7 @@ fun MainContainer(
                                     contentDescription = "Inicio"
                                 )
                             },
-                            label = { Text("Inicio") },
+                            label = { Text("Inicio", fontSize = 10.sp, maxLines = 1) },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = accentColor,
                                 selectedTextColor = accentColor,
@@ -295,7 +280,7 @@ fun MainContainer(
                             modifier = Modifier.testTag("nav_item_home")
                         )
 
-                        // Player Screen item (Canción) -> Shows the list of songs
+                        // Songs Screen item (labeled "Canción" with Play Circle matching Antes 2)
                         NavigationBarItem(
                             selected = currentRoute == "songs",
                             onClick = {
@@ -313,7 +298,7 @@ fun MainContainer(
                                     contentDescription = "Canción"
                                 )
                             },
-                            label = { Text("Canción") },
+                            label = { Text("Canción", fontSize = 10.sp, maxLines = 1) },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = accentColor,
                                 selectedTextColor = accentColor,
@@ -321,7 +306,7 @@ fun MainContainer(
                                 unselectedTextColor = TextGray,
                                 indicatorColor = accentColor.copy(alpha = 0.15f)
                             ),
-                            modifier = Modifier.testTag("nav_item_player")
+                            modifier = Modifier.testTag("nav_item_songs")
                         )
 
                         // Playlist Screen item (Lista)
@@ -342,7 +327,7 @@ fun MainContainer(
                                     contentDescription = "Lista"
                                 )
                             },
-                            label = { Text("Lista") },
+                            label = { Text("Lista", fontSize = 10.sp, maxLines = 1) },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = accentColor,
                                 selectedTextColor = accentColor,
@@ -371,7 +356,7 @@ fun MainContainer(
                                     contentDescription = "Búsqueda"
                                 )
                             },
-                            label = { Text("Búsqueda") },
+                            label = { Text("Búsqueda", fontSize = 10.sp, maxLines = 1) },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = accentColor,
                                 selectedTextColor = accentColor,
@@ -449,6 +434,38 @@ fun MainContainer(
             }
             composable("search") {
                 SearchScreen(
+                    viewModel = viewModel,
+                    modifier = Modifier.padding(innerPadding)
+                ) { song ->
+                    viewModel.selectSong(song)
+                    navController.navigate("player") {
+                        popUpTo(navController.graph.findStartDestination().id) {
+                            saveState = true
+                        }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                }
+            }
+
+            composable("library") {
+                LibraryScreen(
+                    viewModel = viewModel,
+                    modifier = Modifier.padding(innerPadding)
+                ) { song ->
+                    viewModel.selectSong(song)
+                    navController.navigate("player") {
+                        popUpTo(navController.graph.findStartDestination().id) {
+                            saveState = true
+                        }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                }
+            }
+
+            composable("favorites") {
+                FavoritesScreen(
                     viewModel = viewModel,
                     modifier = Modifier.padding(innerPadding)
                 ) { song ->

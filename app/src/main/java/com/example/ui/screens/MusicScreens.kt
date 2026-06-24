@@ -16,6 +16,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -58,6 +59,7 @@ import com.example.model.Song
 import com.example.ui.theme.*
 import com.example.viewmodel.MusicViewModel
 import com.example.viewmodel.Playlist
+import com.example.viewmodel.FolderInfo
 
 // Helper format function for duration seconds
 fun formatTime(seconds: Int): String {
@@ -120,6 +122,134 @@ fun parseLrc(lyricsText: String): List<SyncedLyricLine> {
 }
 
 @Composable
+fun AlbumCard(
+    folderName: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .width(110.dp)
+            .clickable { onClick() },
+        horizontalAlignment = Alignment.Start
+    ) {
+        // Square vinyl disc placeholder with modern gradient background
+        Box(
+            modifier = Modifier
+                .size(110.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color(0xFF2E2E3E), Color(0xFF1E1E2E))
+                    )
+                )
+                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            // Concentric circles representing a vinyl/CD
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.9f)),
+                contentAlignment = Alignment.Center
+            ) {
+                // Outer groove line
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    // Center label with neon color based on folder name hash
+                    val colorList = listOf(NeonCyan, NeonMagenta, NeonLavender, Color(0xFF4EFE80))
+                    val colorIdx = folderName.hashCode().coerceAtLeast(0) % colorList.size
+                    val labelColor = colorList[colorIdx]
+                    
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(CircleShape)
+                            .background(labelColor.copy(alpha = 0.8f))
+                    ) {
+                        // Tiny spindle hole
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(Color.Black)
+                                .align(Alignment.Center)
+                        )
+                    }
+                }
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        Text(
+            text = folderName,
+            color = Color.White,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 2.dp)
+        )
+    }
+}
+
+@Composable
+fun ArtistCard(
+    artistName: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .width(100.dp)
+            .clickable { onClick() },
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Circular profile placeholder with subtle radial neon pulse
+        Box(
+            modifier = Modifier
+                .size(80.dp)
+                .clip(CircleShape)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(NeonMagenta.copy(alpha = 0.3f), Color.Transparent),
+                        radius = 120f
+                    )
+                )
+                .border(2.dp, NeonMagenta.copy(alpha = 0.6f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Person,
+                contentDescription = artistName,
+                tint = NeonMagenta,
+                modifier = Modifier.size(36.dp)
+            )
+        }
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        Text(
+            text = artistName,
+            color = Color.White,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+@Composable
 fun HomeScreen(
     viewModel: MusicViewModel,
     modifier: Modifier = Modifier,
@@ -127,6 +257,7 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current
     val songs by viewModel.songsFlow.collectAsState()
+    val folders by viewModel.foldersFlow.collectAsState()
     val currentSong by viewModel.currentSong.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
     val hasPermission by viewModel.hasStoragePermission.collectAsState()
@@ -374,19 +505,182 @@ fun HomeScreen(
             }
         }
 
-        // Section Title: Quick Play
+        if (folders.isNotEmpty()) {
+            // 1. Section: Álbumes
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(ContainerDark)
+                        .padding(20.dp)
+                        .padding(bottom = 8.dp)
+                ) {
+                    Text(
+                        text = "Álbumes",
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                    
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(folders) { folder ->
+                            AlbumCard(
+                                folderName = folder.name,
+                                onClick = {
+                                    if (folder.songs.isNotEmpty()) {
+                                        viewModel.selectSong(folder.songs[0])
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+
+            // 2. Section: Artistas
+            item {
+                val artists = remember(songs) {
+                    val grouped: Map<String, List<Song>> = songs.groupBy { it.artist }
+                    grouped.map { (name: String, artistSongs: List<Song>) ->
+                        FolderInfo(name, "", artistSongs)
+                    }
+                }
+                if (artists.isNotEmpty()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(ContainerDark)
+                            .padding(20.dp)
+                            .padding(bottom = 8.dp)
+                    ) {
+                        Text(
+                            text = "Artistas",
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color.White,
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+                        
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            items(artists) { artist ->
+                                ArtistCard(
+                                    artistName = artist.name,
+                                    onClick = {
+                                        if (artist.songs.isNotEmpty()) {
+                                            viewModel.selectSong(artist.songs[0])
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
+            }
+
+            // 3. Section: Álbumes Favoritos
+            item {
+                val favoriteFolders = remember(folders) {
+                    folders.filter { folder -> folder.songs.any { it.isFavorite } }
+                }
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(ContainerDark)
+                        .padding(20.dp)
+                        .padding(bottom = 8.dp)
+                ) {
+                    Text(
+                        text = "Álbumes Favoritos",
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                    
+                    if (favoriteFolders.isNotEmpty()) {
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            items(favoriteFolders) { folder ->
+                                AlbumCard(
+                                    folderName = folder.name,
+                                    onClick = {
+                                        val favSong = folder.songs.find { it.isFavorite } ?: folder.songs[0]
+                                        viewModel.selectSong(favSong)
+                                    }
+                                )
+                            }
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color.White.copy(alpha = 0.03f))
+                                .border(1.dp, NeonMagenta.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                                .clickable {
+                                    if (songs.isNotEmpty()) {
+                                        viewModel.toggleFavorite(songs[0].id)
+                                    }
+                                }
+                                .padding(16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Favorite,
+                                    contentDescription = null,
+                                    tint = NeonMagenta,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Column {
+                                    Text(
+                                        text = "Sin Álbumes Favoritos",
+                                        color = Color.White,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "Presiona el corazón de cualquier pista para marcarla como favorita.",
+                                        color = TextGray,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+        }
+
         if (songs.isNotEmpty()) {
             item {
                 Text(
                     text = "Pistas Populares",
-                    style = MaterialTheme.typography.titleMedium,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Black,
                     color = NeonMagenta,
-                    fontWeight = FontWeight.ExtraBold,
-                    modifier = Modifier.padding(bottom = 12.dp)
+                    modifier = Modifier.padding(top = 16.dp, bottom = 16.dp)
                 )
             }
 
-            // Song list content
             items(songs) { song ->
                 val isActive = currentSong?.id == song.id
                 SongRowItem(
@@ -611,6 +905,13 @@ fun PlayerScreen(
     val buttonStyle by viewModel.buttonStyle.collectAsState()
     val filledIcons by viewModel.filledIcons.collectAsState()
     val customControlsColor by viewModel.customControlsColor.collectAsState()
+
+    val currentQualityDetails by viewModel.currentQualityDetails.collectAsState()
+    var showCodecTooltip by remember { mutableStateOf(false) }
+
+    LaunchedEffect(currentSong) {
+        showCodecTooltip = false
+    }
 
     if (currentSong == null) {
         Box(
@@ -869,16 +1170,25 @@ fun PlayerScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                val lyricsText = song.lyrics ?: ""
+                                val isSynced = remember(lyricsText) {
+                                    lyricsText.contains(Regex("""\[\d{2}:\d{2}"""))
+                                }
+                                val lyricsLabel = if (isSynced) {
+                                    if (song.physicalPath != null) "LYRICS SYNCED (SYLT)" else "LYRICS SYNCED"
+                                } else {
+                                    "LYRICS EMBEDDED (USLT/©LYR)"
+                                }
                                 Text(
-                                    text = "Lyrics Verified",
+                                    text = lyricsLabel,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Black,
                                     letterSpacing = 2.sp,
                                     color = MaterialTheme.colorScheme.primary
                                 )
                                 Icon(
-                                    imageVector = Icons.Default.CheckCircle,
-                                    contentDescription = "Verified Icon",
+                                    imageVector = if (isSynced) Icons.Default.CheckCircle else Icons.Default.Info,
+                                    contentDescription = "Lyrics Status Icon",
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(14.dp)
                                 )
@@ -971,7 +1281,7 @@ fun PlayerScreen(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Title and Artist Info (aligned left / start as per mock-up)
+        // Title, Artist, Quality Badges and Album Info (aligned left / start as per mock-up)
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
             horizontalAlignment = Alignment.Start
@@ -984,13 +1294,87 @@ fun PlayerScreen(
                 letterSpacing = (-0.5).sp,
                 modifier = Modifier.testTag("player_song_title")
             )
-            Spacer(modifier = Modifier.height(2.dp))
+            Spacer(modifier = Modifier.height(6.dp))
+            
+            // Row with Artist Badge and Format/Bitrate Badge
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Start,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                // Artist Badge
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color.White.copy(alpha = 0.08f))
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                ) {
+                    Text(
+                        text = song.artist,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White.copy(alpha = 0.9f)
+                    )
+                }
+                
+                Spacer(modifier = Modifier.width(8.dp))
+                
+                // Quality Badge (Format | Bitrate) - Interactive!
+                val formatText = currentQualityDetails?.format ?: "MP3"
+                val bitrateText = currentQualityDetails?.bitrate ?: "192kbps"
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color.White.copy(alpha = 0.08f))
+                        .clickable { showCodecTooltip = !showCodecTooltip }
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                ) {
+                    Text(
+                        text = "$formatText | $bitrateText",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(6.dp))
+            
+            // Album Name line in NeonLavender/purple
             Text(
-                text = "${song.artist} — ${song.album}",
+                text = song.album,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
                 color = NeonLavender.copy(alpha = 0.8f) // matching text-[#E0B0FF] opacity-80
             )
+            
+            // Codec Tooltip - Animated overlay / display
+            val codecText = currentQualityDetails?.codec ?: "MP3"
+            AnimatedVisibility(
+                visible = showCodecTooltip,
+                enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
+                exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top)
+            ) {
+                Column {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFF1E1E1E))
+                            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                            .padding(horizontal = 14.dp, vertical = 8.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "🎧 $codecText",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(18.dp))
@@ -2216,6 +2600,295 @@ fun QueueScreen(
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun LibraryScreen(
+    viewModel: MusicViewModel,
+    modifier: Modifier = Modifier,
+    onSongSelected: (Song) -> Unit
+) {
+    val folders by viewModel.foldersFlow.collectAsState()
+    val currentSong by viewModel.currentSong.collectAsState()
+    val isPlaying by viewModel.isPlaying.collectAsState()
+    
+    // Internal state to track if a folder is selected for detail view
+    var selectedFolderName by remember { mutableStateOf<String?>(null) }
+    
+    val currentFolder = folders.find { it.name == selectedFolderName }
+    
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = 20.dp)
+    ) {
+        if (selectedFolderName != null && currentFolder != null) {
+            // FOLDER SONGS DETAIL VIEW
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = { selectedFolderName = null },
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Atrás",
+                        tint = Color.White
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Column {
+                    Text(
+                        text = currentFolder.name,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Text(
+                        text = "${currentFolder.songs.size} canciones",
+                        fontSize = 13.sp,
+                        color = TextGray
+                    )
+                }
+            }
+            
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 120.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(currentFolder.songs) { song ->
+                    val isActive = currentSong?.id == song.id
+                    SongRowItem(
+                        song = song,
+                        isActive = isActive,
+                        isPlaying = isPlaying && isActive,
+                        onClick = { onSongSelected(song) },
+                        onFavoriteToggle = { viewModel.toggleFavorite(song.id) }
+                    )
+                }
+            }
+        } else {
+            // FOLDERS LIST VIEW
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(vertical = 16.dp)
+            ) {
+                Text(
+                    text = "Biblioteca",
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color.White
+                )
+                Text(
+                    text = "Carpetas locales detectadas",
+                    color = NeonCyan.copy(alpha = 0.8f),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+            
+            if (folders.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Folder,
+                            contentDescription = null,
+                            tint = TextMuted,
+                            modifier = Modifier.size(64.dp)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "No se encontraron carpetas",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Escanea música local desde la pantalla de Inicio.",
+                            fontSize = 13.sp,
+                            color = TextGray,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 120.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(folders) { folder ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(ContainerDark)
+                                .clickable { selectedFolderName = folder.name }
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Folder icon box with custom decoration
+                            Box(
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(NeonCyan.copy(alpha = 0.1f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Folder,
+                                    contentDescription = null,
+                                    tint = NeonCyan,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = folder.name,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = if (folder.path.isNotEmpty()) folder.path else "Ruta desconocida",
+                                    fontSize = 11.sp,
+                                    color = TextGray,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column(horizontalAlignment = Alignment.End) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color.White.copy(alpha = 0.05f))
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        text = "${folder.songs.size} pistas",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = NeonCyan
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun FavoritesScreen(
+    viewModel: MusicViewModel,
+    modifier: Modifier = Modifier,
+    onSongSelected: (Song) -> Unit
+) {
+    val songs by viewModel.songsFlow.collectAsState()
+    val favoriteSongs = remember(songs) { songs.filter { it.isFavorite } }
+    val currentSong by viewModel.currentSong.collectAsState()
+    val isPlaying by viewModel.isPlaying.collectAsState()
+    
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = 20.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(vertical = 16.dp)
+        ) {
+            Text(
+                text = "Favoritos",
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Black,
+                color = Color.White
+            )
+            Text(
+                text = "Tus canciones preferidas",
+                color = NeonMagenta.copy(alpha = 0.8f),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
+        
+        if (favoriteSongs.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Favorite,
+                        contentDescription = null,
+                        tint = TextMuted,
+                        modifier = Modifier.size(64.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Aún sin favoritos",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Toca el ícono de corazón en cualquier canción para guardarla aquí.",
+                        fontSize = 13.sp,
+                        color = TextGray,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 24.dp)
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 120.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(favoriteSongs) { song ->
+                    val isActive = currentSong?.id == song.id
+                    SongRowItem(
+                        song = song,
+                        isActive = isActive,
+                        isPlaying = isPlaying && isActive,
+                        onClick = { onSongSelected(song) },
+                        onFavoriteToggle = { viewModel.toggleFavorite(song.id) }
+                    )
                 }
             }
         }

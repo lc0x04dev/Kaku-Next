@@ -31,6 +31,9 @@ object PlaybackManager {
     private val _playlist = MutableStateFlow<List<Song>>(emptyList())
     val playlist: StateFlow<List<Song>> = _playlist.asStateFlow()
 
+    private val _currentQualityDetails = MutableStateFlow<AudioQualityDetails?>(null)
+    val currentQualityDetails: StateFlow<AudioQualityDetails?> = _currentQualityDetails.asStateFlow()
+
     private var mediaPlayer: MediaPlayer? = null
     private var timerJob: Job? = null
 
@@ -67,6 +70,7 @@ object PlaybackManager {
         _isPlaying.value = false
         mediaPlayer?.release()
         mediaPlayer = null
+        updateQualityDetails(song, getSandboxContext())
     }
 
     fun restoreSongAndPosition(song: Song, positionSeconds: Int) {
@@ -75,6 +79,7 @@ object PlaybackManager {
         _isPlaying.value = false
         mediaPlayer?.release()
         mediaPlayer = null
+        updateQualityDetails(song, getSandboxContext())
     }
 
     fun playSong(song: Song, list: List<Song>, context: Context) {
@@ -82,6 +87,7 @@ object PlaybackManager {
         _playlist.value = list
         _currentPosition.value = 0
         _isPlaying.value = true
+        updateQualityDetails(song, context)
 
         playActual(song, context)
         notifyService(context, MusicService.ACTION_PLAY)
@@ -240,6 +246,21 @@ object PlaybackManager {
         _isPlaying.value = false
     }
 
+    fun reset() {
+        stopTimer()
+        try {
+            mediaPlayer?.release()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        mediaPlayer = null
+        _currentSong.value = null
+        _playlist.value = emptyList()
+        _isPlaying.value = false
+        _currentPosition.value = 0
+        _currentQualityDetails.value = null
+    }
+
     private var sandboxContext: Context? = null
     fun setSandboxContext(context: Context) {
         sandboxContext = context.applicationContext
@@ -262,4 +283,98 @@ object PlaybackManager {
             e.printStackTrace()
         }
     }
+
+    private fun updateQualityDetails(song: Song?, context: Context?) {
+        scope.launch {
+            val details = withContext(Dispatchers.IO) {
+                getAudioQualityDetails(context, song)
+            }
+            _currentQualityDetails.value = details
+        }
+    }
+
+    private fun getAudioQualityDetails(context: Context?, song: Song?): AudioQualityDetails {
+        if (song == null) return AudioQualityDetails("MP3", "192kbps", "MP3")
+        
+        var format = "MP3"
+        var bitrateVal = 192 // kbps
+        var codec = "MP3"
+        
+        // Extension fallback
+        val ext = song.physicalPath?.substringAfterLast('.', "")?.uppercase() 
+            ?: song.filePath?.substringAfterLast('.', "")?.uppercase() 
+            ?: ""
+        
+        if (ext.isNotEmpty()) {
+            format = when (ext) {
+                "M4A", "AAC" -> "M4A"
+                "WAV" -> "WAV"
+                "FLAC" -> "FLAC"
+                "OGG" -> "OGG"
+                else -> ext
+            }
+            codec = when (ext) {
+                "M4A", "AAC" -> "MP4A-LATM"
+                "WAV" -> "PCM"
+                "FLAC" -> "FLAC"
+                "OGG" -> "VORBIS"
+                else -> ext
+            }
+        }
+        
+        // Attempt actual extraction if local file exists and context is provided
+        if (song.filePath != null && context != null) {
+            val retriever = android.media.MediaMetadataRetriever()
+            try {
+                if (song.filePath.startsWith("content://")) {
+                    retriever.setDataSource(context, android.net.Uri.parse(song.filePath))
+                } else {
+                    retriever.setDataSource(song.filePath)
+                }
+                
+                val bRate = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_BITRATE)
+                if (!bRate.isNullOrEmpty()) {
+                    val kbps = bRate.toIntOrNull()?.let { it / 1000 }
+                    if (kbps != null && kbps > 0) {
+                        bitrateVal = kbps
+                    }
+                }
+                
+                val mime = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_MIMETYPE)
+                if (!mime.isNullOrEmpty()) {
+                    val mimeLower = mime.lowercase()
+                    if (mimeLower.contains("mpeg") || mimeLower.contains("mp3")) {
+                        format = "MP3"
+                        codec = "MP3"
+                    } else if (mimeLower.contains("mp4") || mimeLower.contains("m4a") || mimeLower.contains("aac")) {
+                        format = "M4A"
+                        codec = "MP4A-LATM"
+                    } else if (mimeLower.contains("wav") || mimeLower.contains("wave") || mimeLower.contains("x-wav")) {
+                        format = "WAV"
+                        codec = "PCM"
+                    } else if (mimeLower.contains("flac")) {
+                        format = "FLAC"
+                        codec = "FLAC"
+                    } else if (mimeLower.contains("ogg") || mimeLower.contains("opus") || mimeLower.contains("vorbis")) {
+                        format = "OGG"
+                        codec = if (mimeLower.contains("opus")) "OPUS" else "VORBIS"
+                    }
+                }
+            } catch (e: Exception) {
+                // keep the extension fallback
+            } finally {
+                try {
+                    retriever.release()
+                } catch (e: Exception) {}
+            }
+        }
+        
+        return AudioQualityDetails(format, "${bitrateVal}kbps", codec)
+    }
 }
+
+data class AudioQualityDetails(
+    val format: String,      // e.g. "MP3", "M4A"
+    val bitrate: String,     // e.g. "192kbps", "320kbps"
+    val codec: String        // e.g. "MP4A-LATM", "MP3", "FLAC", "PCM"
+)
