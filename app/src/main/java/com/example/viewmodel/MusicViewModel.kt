@@ -82,6 +82,21 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _playerBackgroundPreset = MutableStateFlow(prefs.getString("prefs_player_background_preset", "Gradiente 3") ?: "Gradiente 3")
     val playerBackgroundPreset = _playerBackgroundPreset.asStateFlow()
 
+    private val _coverDesign = MutableStateFlow(prefs.getString("prefs_cover_design", "Estándar") ?: "Estándar")
+    val coverDesign = _coverDesign.asStateFlow()
+
+    private val _coverAnimation = MutableStateFlow(prefs.getString("prefs_cover_animation", "Ninguna") ?: "Ninguna")
+    val coverAnimation = _coverAnimation.asStateFlow()
+
+    private val _coverColorMode = MutableStateFlow(prefs.getString("prefs_cover_color_mode", "Por defecto (Gradiente)") ?: "Por defecto (Gradiente)")
+    val coverColorMode = _coverColorMode.asStateFlow()
+
+    private val _progressBarCustomColorEnabled = MutableStateFlow(prefs.getBoolean("prefs_progress_bar_custom_color_enabled", false))
+    val progressBarCustomColorEnabled = _progressBarCustomColorEnabled.asStateFlow()
+
+    private val _progressBarCustomColor = MutableStateFlow(prefs.getLong("prefs_progress_bar_custom_color", 0xFFFFFFFF))
+    val progressBarCustomColor = _progressBarCustomColor.asStateFlow()
+
     fun setAudioHiFi(value: Boolean) {
         _audioHiFi.value = value
         prefs.edit().putBoolean("prefs_audio_hifi", value).apply()
@@ -165,6 +180,31 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun setPlayerBackgroundPreset(value: String) {
         _playerBackgroundPreset.value = value
         prefs.edit().putString("prefs_player_background_preset", value).apply()
+    }
+
+    fun setCoverDesign(value: String) {
+        _coverDesign.value = value
+        prefs.edit().putString("prefs_cover_design", value).apply()
+    }
+
+    fun setCoverAnimation(value: String) {
+        _coverAnimation.value = value
+        prefs.edit().putString("prefs_cover_animation", value).apply()
+    }
+
+    fun setCoverColorMode(value: String) {
+        _coverColorMode.value = value
+        prefs.edit().putString("prefs_cover_color_mode", value).apply()
+    }
+
+    fun setProgressBarCustomColorEnabled(value: Boolean) {
+        _progressBarCustomColorEnabled.value = value
+        prefs.edit().putBoolean("prefs_progress_bar_custom_color_enabled", value).apply()
+    }
+
+    fun setProgressBarCustomColor(value: Long) {
+        _progressBarCustomColor.value = value
+        prefs.edit().putLong("prefs_progress_bar_custom_color", value).apply()
     }
 
     private val availableSongs = emptyList<Song>()
@@ -347,9 +387,15 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // ACTIONS
-    fun selectSong(song: Song, forcePlay: Boolean = true) {
+    fun selectSong(song: Song, forcePlay: Boolean = true, customList: List<Song>? = null) {
+        val currentPlaylist = com.example.service.PlaybackManager.playlist.value
+        val listToPlay = when {
+            customList != null -> customList
+            currentPlaylist.any { it.id == song.id } -> currentPlaylist
+            else -> _songsFlow.value
+        }
         if (forcePlay) {
-            com.example.service.PlaybackManager.playSong(song, _songsFlow.value, getAttributedContext())
+            com.example.service.PlaybackManager.playSong(song, listToPlay, getAttributedContext())
         } else {
             com.example.service.PlaybackManager.selectSongWithoutPlaying(song)
         }

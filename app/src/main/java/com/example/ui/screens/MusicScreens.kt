@@ -55,6 +55,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.model.Song
 import com.example.ui.theme.*
 import com.example.viewmodel.MusicViewModel
@@ -260,6 +262,7 @@ fun HomeScreen(
     val folders by viewModel.foldersFlow.collectAsState()
     val currentSong by viewModel.currentSong.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
+    var activeFolderDetails by remember { mutableStateOf<FolderInfo?>(null) }
     val hasPermission by viewModel.hasStoragePermission.collectAsState()
     val showSyncBanner by viewModel.showSyncBanner.collectAsState()
     val isScanning by viewModel.isScanning.collectAsState()
@@ -532,9 +535,7 @@ fun HomeScreen(
                             AlbumCard(
                                 folderName = folder.name,
                                 onClick = {
-                                    if (folder.songs.isNotEmpty()) {
-                                        viewModel.selectSong(folder.songs[0])
-                                    }
+                                    activeFolderDetails = folder
                                 }
                             )
                         }
@@ -618,8 +619,7 @@ fun HomeScreen(
                                 AlbumCard(
                                     folderName = folder.name,
                                     onClick = {
-                                        val favSong = folder.songs.find { it.isFavorite } ?: folder.songs[0]
-                                        viewModel.selectSong(favSong)
+                                        activeFolderDetails = folder
                                     }
                                 )
                             }
@@ -722,6 +722,302 @@ fun HomeScreen(
                         textAlign = TextAlign.Center,
                         modifier = Modifier.padding(horizontal = 16.dp)
                     )
+                }
+            }
+        }
+    }
+
+    if (activeFolderDetails != null) {
+        val folder = activeFolderDetails!!
+        Dialog(
+            onDismissRequest = { activeFolderDetails = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFF0F0F13))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .statusBarsPadding()
+                        .navigationBarsPadding()
+                ) {
+                    // Top App Bar
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(64.dp)
+                            .padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        IconButton(onClick = { activeFolderDetails = null }) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowBack,
+                                contentDescription = "Volver",
+                                tint = Color.White
+                            )
+                        }
+                        
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            IconButton(onClick = { /* Opciones estéticas para mockup */ }) {
+                                Icon(
+                                    imageVector = Icons.Default.PlaylistAdd,
+                                    contentDescription = "Añadir a lista",
+                                    tint = Color.White
+                                )
+                            }
+                            IconButton(onClick = { /* Opciones estéticas para mockup */ }) {
+                                Icon(
+                                    imageVector = Icons.Default.MoreVert,
+                                    contentDescription = "Más opciones",
+                                    tint = Color.White
+                                )
+                            }
+                        }
+                    }
+
+                    // Scrollable Tracklist & Cover
+                    LazyColumn(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 20.dp),
+                        contentPadding = PaddingValues(bottom = 100.dp)
+                    ) {
+                        // Giant Rotating Vinyl Record at the top
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 12.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(260.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF0B0B0E))
+                                        .border(2.dp, Color.White.copy(alpha = 0.04f), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(220.dp)
+                                            .clip(CircleShape)
+                                            .border(1.dp, Color.White.copy(alpha = 0.05f), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(180.dp)
+                                                .clip(CircleShape)
+                                                .border(1.dp, Color.White.copy(alpha = 0.05f), CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(140.dp)
+                                                    .clip(CircleShape)
+                                                    .border(1.dp, Color.White.copy(alpha = 0.05f), CircleShape),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(64.dp)
+                                                        .clip(CircleShape)
+                                                        .background(Color(0xFF1E1E2E)),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(16.dp)
+                                                            .clip(CircleShape)
+                                                            .background(Color(0xFF0B0B0E))
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Metadata Block
+                        item {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            
+                            val formats = folder.songs.map { song ->
+                                val path = song.physicalPath ?: song.filePath ?: ""
+                                when {
+                                    path.lowercase().endsWith(".mp4") || path.lowercase().endsWith(".m4a") -> "MP4"
+                                    path.lowercase().endsWith(".flac") -> "FLAC"
+                                    path.lowercase().endsWith(".wav") -> "WAV"
+                                    else -> "MP3"
+                                }
+                            }.distinct().sorted()
+                            val formatText = if (formats.isEmpty()) "MP3" else formats.joinToString(" / ")
+
+                            val totalSeconds = folder.songs.sumOf { it.durationSeconds }
+                            val totalMinutes = totalSeconds / 60
+                            val metadataText = "${folder.songs.size} pistas, $totalMinutes minutos"
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = folder.name,
+                                        fontSize = 28.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = Color.White,
+                                        lineHeight = 34.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.Person,
+                                            contentDescription = null,
+                                            tint = TextGray,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = folder.songs.firstOrNull()?.artist ?: "Artista desconocido",
+                                            fontSize = 13.sp,
+                                            color = Color.White.copy(alpha = 0.8f)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = metadataText,
+                                        fontSize = 12.sp,
+                                        color = TextGray
+                                    )
+                                }
+                                
+                                Box(
+                                    modifier = Modifier
+                                        .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(4.dp))
+                                        .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        text = formatText,
+                                        color = Color.White,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(24.dp))
+                        }
+
+                        // Songs
+                        items(folder.songs) { song ->
+                            val isCurrent = currentSong?.id == song.id
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        viewModel.selectSong(song, forcePlay = true, customList = folder.songs)
+                                    }
+                                    .padding(vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = if (isCurrent && isPlaying) Icons.Default.VolumeUp else Icons.Default.MusicNote,
+                                    contentDescription = null,
+                                    tint = if (isCurrent) NeonCyan else Color.White.copy(alpha = 0.6f),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = song.title,
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (isCurrent) NeonCyan else Color.White,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = song.artist,
+                                        fontSize = 12.sp,
+                                        color = TextGray,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                Text(
+                                    text = song.duration,
+                                    fontSize = 13.sp,
+                                    color = TextGray
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Play / Shuffle Floating Bar
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(bottom = 24.dp, end = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Color.White.copy(alpha = 0.12f))
+                            .clickable {
+                                if (folder.songs.isNotEmpty()) {
+                                    val shuffledList = folder.songs.shuffled()
+                                    viewModel.selectSong(shuffledList[0], forcePlay = true, customList = shuffledList)
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Shuffle,
+                            contentDescription = "Reproducción aleatoria",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    Button(
+                        onClick = {
+                            if (folder.songs.isNotEmpty()) {
+                                viewModel.selectSong(folder.songs[0], forcePlay = true, customList = folder.songs)
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFE2E2E6),
+                            contentColor = Color.Black
+                        ),
+                        shape = RoundedCornerShape(24.dp),
+                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
+                        modifier = Modifier.height(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Reproducir todo",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                    }
                 }
             }
         }
@@ -899,6 +1195,8 @@ fun PlayerScreen(
     val progressBarStyle by viewModel.progressBarStyle.collectAsState()
     val playerBackgroundStyle by viewModel.playerBackgroundStyle.collectAsState()
     val playerBackgroundPreset by viewModel.playerBackgroundPreset.collectAsState()
+    val progressBarCustomColorEnabled by viewModel.progressBarCustomColorEnabled.collectAsState()
+    val progressBarCustomColor by viewModel.progressBarCustomColor.collectAsState()
 
     val coverShape by viewModel.coverShape.collectAsState()
     val coverSize by viewModel.coverSize.collectAsState()
@@ -1005,6 +1303,97 @@ fun PlayerScreen(
                 frontPath.lineTo(size.width, size.height)
                 frontPath.close()
                 drawPath(path = frontPath, color = Color(0xFF1E284C))
+            }
+        }
+        playerBackgroundStyle == "Static Colors" && playerBackgroundPreset == "Místico Aleatorio" -> {
+            val gradientPairs = listOf(
+                listOf(Color(0xFF8E2DE2), Color(0xFF4A00E0)),
+                listOf(Color(0xFFDE125F), Color(0xFF2C0E37)),
+                listOf(Color(0xFF0F2027), Color(0xFF2C5364)),
+                listOf(Color(0xFF00FF87), Color(0xFF60EFFF)),
+                listOf(Color(0xFFf953c6), Color(0xFFb91d73)),
+                listOf(Color(0xFF00c6ff), Color(0xFF0072ff)),
+                listOf(Color(0xFFf12711), Color(0xFFf5af19)),
+                listOf(Color(0xFFFF007F), Color(0xFF7F00FF))
+            )
+            val pairIndex = song.title.hashCode().coerceAtLeast(0).let { it % gradientPairs.size }
+            Modifier.background(Brush.verticalGradient(gradientPairs[pairIndex]))
+        }
+        playerBackgroundStyle == "Static Colors" && playerBackgroundPreset == "Nebulosa Cósmica" -> {
+            val nebulaColors = listOf(
+                listOf(Color(0xFFec38bc), Color(0xFF7303c0)),
+                listOf(Color(0xFF00E5FF), Color(0xFF1A237E)),
+                listOf(Color(0xFFFF5252), Color(0xFF4A148C)),
+                listOf(Color(0xFF00FFCC), Color(0xFF006064))
+            )
+            val colIndex = song.title.hashCode().coerceAtLeast(0).let { it % nebulaColors.size }
+            val colors = nebulaColors[colIndex]
+            Modifier.drawBehind {
+                drawRect(color = Color(0xFF03001e))
+                drawCircle(
+                    color = colors[0].copy(alpha = 0.4f),
+                    center = androidx.compose.ui.geometry.Offset(size.width * 0.35f, size.height * 0.45f),
+                    radius = size.width * 0.75f
+                )
+                drawCircle(
+                    color = colors[1].copy(alpha = 0.3f),
+                    center = androidx.compose.ui.geometry.Offset(size.width * 0.65f, size.height * 0.55f),
+                    radius = size.width * 0.65f
+                )
+            }
+        }
+        playerBackgroundStyle == "Static Colors" && playerBackgroundPreset == "Cyberpunk Retro" -> {
+            val cyberColors = listOf(
+                listOf(Color(0xFFFF007F), Color(0xFF00FFCC)),
+                listOf(Color(0xFFFF5252), Color(0xFFFFEB3B)),
+                listOf(Color(0xFFE040FB), Color(0xFF00E5FF))
+            )
+            val colIndex = song.title.hashCode().coerceAtLeast(0).let { it % cyberColors.size }
+            val colors = cyberColors[colIndex]
+            Modifier.drawBehind {
+                drawRect(color = Color(0xFF09090D))
+                
+                // Draw retro sun
+                drawCircle(
+                    color = colors[0].copy(alpha = 0.2f),
+                    center = androidx.compose.ui.geometry.Offset(size.width * 0.5f, size.height * 0.5f),
+                    radius = size.width * 0.35f
+                )
+                
+                // Draw horizon
+                val horizonY = size.height * 0.65f
+                drawLine(
+                    color = colors[1].copy(alpha = 0.6f),
+                    start = androidx.compose.ui.geometry.Offset(0f, horizonY),
+                    end = androidx.compose.ui.geometry.Offset(size.width, horizonY),
+                    strokeWidth = 3f
+                )
+                
+                // Receding horizontal lines
+                for (i in 1..8) {
+                    val ratio = i.toFloat() / 8f
+                    val y = horizonY + ratio * (size.height - horizonY)
+                    drawLine(
+                        color = colors[1].copy(alpha = 0.25f * ratio),
+                        start = androidx.compose.ui.geometry.Offset(0f, y),
+                        end = androidx.compose.ui.geometry.Offset(size.width, y),
+                        strokeWidth = 1f + ratio * 2f
+                    )
+                }
+                
+                // Receding vertical lines
+                val numGridLines = 10
+                for (i in 0..numGridLines) {
+                    val startX = size.width * (i.toFloat() / numGridLines.toFloat())
+                    // Draw perspective projection grid lines
+                    val endX = size.width * 0.5f + (startX - size.width * 0.5f) * 2.5f
+                    drawLine(
+                        color = colors[1].copy(alpha = 0.15f),
+                        start = androidx.compose.ui.geometry.Offset(startX, horizonY),
+                        end = androidx.compose.ui.geometry.Offset(endX, size.height),
+                        strokeWidth = 1.5f
+                    )
+                }
             }
         }
         else -> {
@@ -1381,6 +1770,7 @@ fun PlayerScreen(
 
         // Progress Slider & Timers
         Column(modifier = Modifier.fillMaxWidth()) {
+            val activeColor = if (progressBarCustomColorEnabled) Color(progressBarCustomColor) else Color.White
             if (progressBarStyle == "Por defecto") {
                 Slider(
                     value = currentPosition.toFloat(),
@@ -1389,8 +1779,8 @@ fun PlayerScreen(
                     },
                     valueRange = 0f..song.durationSeconds.toFloat(),
                     colors = SliderDefaults.colors(
-                                        thumbColor = MaterialTheme.colorScheme.primary,
-                                        activeTrackColor = MaterialTheme.colorScheme.primary,
+                                        thumbColor = activeColor,
+                                        activeTrackColor = activeColor,
                                         inactiveTrackColor = Color.White.copy(alpha = 0.1f)
                                     ),
                     modifier = Modifier
@@ -1405,6 +1795,8 @@ fun PlayerScreen(
                     },
                     valueRange = 0f..song.durationSeconds.toFloat(),
                     styleName = progressBarStyle,
+                    customColorEnabled = progressBarCustomColorEnabled,
+                    customColor = Color(progressBarCustomColor),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("playback_slider")
@@ -1435,10 +1827,27 @@ fun PlayerScreen(
         val buttonTint = if (customControlsColor) accentColor else TextWhite
         val favoriteBorderIcon = if (filledIcons) Icons.Default.Favorite else Icons.Default.FavoriteBorder
 
+        // Interaction sources for play/pause, prev and next buttons to trigger the scale animation on press
+        val playInteractionSource = remember { MutableInteractionSource() }
+        val prevInteractionSource = remember { MutableInteractionSource() }
+        val nextInteractionSource = remember { MutableInteractionSource() }
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 36.dp),
+                .padding(bottom = 36.dp)
+                .then(
+                    if (buttonStyle == "Play 5") {
+                        Modifier
+                            .padding(horizontal = 16.dp)
+                            .clip(RoundedCornerShape(32.dp))
+                            .background(Color.White.copy(alpha = 0.04f))
+                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(32.dp))
+                            .padding(vertical = 4.dp)
+                    } else {
+                        Modifier
+                    }
+                ),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -1458,8 +1867,10 @@ fun PlayerScreen(
             // Skip Previous
             IconButton(
                 onClick = { viewModel.playPreviousSong() },
+                interactionSource = prevInteractionSource,
                 modifier = Modifier
                     .size(48.dp)
+                    .scaleOnPress(prevInteractionSource)
                     .testTag("skip_prev_button")
             ) {
                 Icon(
@@ -1479,9 +1890,14 @@ fun PlayerScreen(
                     Box(
                         modifier = Modifier
                             .size(64.dp)
+                            .scaleOnPress(playInteractionSource)
                             .clip(RoundedCornerShape(16.dp))
                             .background(btnBg)
-                            .clickable(onClick = { viewModel.togglePlayPause() })
+                            .clickable(
+                                interactionSource = playInteractionSource,
+                                indication = null,
+                                onClick = { viewModel.togglePlayPause() }
+                            )
                             .testTag("play_pause_button"),
                         contentAlignment = Alignment.Center
                     ) {
@@ -1499,8 +1915,13 @@ fun PlayerScreen(
                     Box(
                         modifier = Modifier
                             .size(64.dp)
+                            .scaleOnPress(playInteractionSource)
                             .border(2.dp, btnOutlineColor, CircleShape)
-                            .clickable(onClick = { viewModel.togglePlayPause() })
+                            .clickable(
+                                interactionSource = playInteractionSource,
+                                indication = null,
+                                onClick = { viewModel.togglePlayPause() }
+                            )
                             .testTag("play_pause_button"),
                         contentAlignment = Alignment.Center
                     ) {
@@ -1512,18 +1933,121 @@ fun PlayerScreen(
                         )
                     }
                 }
+                "Play 4" -> {
+                    // "Play 4" -> SquircleStarShape
+                    val btnBg = if (customControlsColor) accentColor else Color.White
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .scaleOnPress(playInteractionSource)
+                            .clip(SquircleStarShape)
+                            .background(btnBg)
+                            .clickable(
+                                interactionSource = playInteractionSource,
+                                indication = null,
+                                onClick = { viewModel.togglePlayPause() }
+                            )
+                            .testTag("play_pause_button"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = playPauseIcon,
+                            contentDescription = if (isPlaying) "Pausar" else "Reproducir",
+                            tint = DeepDark,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                }
+                "Play 5" -> {
+                    // "Play 5" -> Premium capsule gradient button
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .scaleOnPress(playInteractionSource)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.linearGradient(
+                                    colors = listOf(
+                                        if (customControlsColor) accentColor else Color(0xFF00E5FF),
+                                        if (customControlsColor) accentColor.copy(alpha = 0.6f) else Color(0xFF00B0FF)
+                                    )
+                                )
+                            )
+                            .clickable(
+                                interactionSource = playInteractionSource,
+                                indication = null,
+                                onClick = { viewModel.togglePlayPause() }
+                            )
+                            .testTag("play_pause_button"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = playPauseIcon,
+                            contentDescription = if (isPlaying) "Pausar" else "Reproducir",
+                            tint = DeepDark,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                }
+                "Play 6" -> {
+                    // "Play 6" -> Neon glowing outline and pulsing border circle
+                    val infiniteTransition = rememberInfiniteTransition(label = "glow_play")
+                    val animatedGlowRadius by infiniteTransition.animateFloat(
+                        initialValue = 0f,
+                        targetValue = 6f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1500, easing = EaseInOutSine),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "glow"
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .scaleOnPress(playInteractionSource)
+                            .border(
+                                width = 1.dp + animatedGlowRadius.dp / 3,
+                                color = (if (customControlsColor) accentColor else Color(0xFFFF007F)).copy(
+                                    alpha = 0.5f + (6f - animatedGlowRadius) / 12f
+                                ),
+                                shape = CircleShape
+                            )
+                            .padding(4.dp)
+                            .clip(CircleShape)
+                            .background(if (customControlsColor) accentColor else Color.White)
+                            .clickable(
+                                interactionSource = playInteractionSource,
+                                indication = null,
+                                onClick = { viewModel.togglePlayPause() }
+                            )
+                            .testTag("play_pause_button"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = playPauseIcon,
+                            contentDescription = if (isPlaying) "Pausar" else "Reproducir",
+                            tint = DeepDark,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                }
                 else -> {
                     // "Por defecto" -> Circle filled gradient
                     Box(
                         modifier = Modifier
                             .size(64.dp)
+                            .scaleOnPress(playInteractionSource)
                             .clip(CircleShape)
                             .background(
                                 Brush.linearGradient(
                                     colors = if (customControlsColor) listOf(accentColor, accentColor.copy(alpha = 0.7f)) else listOf(accentColor, NeonMagenta)
                                 )
                             )
-                            .clickable(onClick = { viewModel.togglePlayPause() })
+                            .clickable(
+                                interactionSource = playInteractionSource,
+                                indication = null,
+                                onClick = { viewModel.togglePlayPause() }
+                            )
                             .testTag("play_pause_button"),
                         contentAlignment = Alignment.Center
                     ) {
@@ -1540,8 +2064,10 @@ fun PlayerScreen(
             // Skip Next
             IconButton(
                 onClick = { viewModel.playNextSong() },
+                interactionSource = nextInteractionSource,
                 modifier = Modifier
                     .size(48.dp)
+                    .scaleOnPress(nextInteractionSource)
                     .testTag("skip_next_button")
             ) {
                 Icon(
@@ -2094,6 +2620,8 @@ fun CustomInteractiveSlider(
     onValueChange: (Float) -> Unit,
     valueRange: ClosedFloatingPointRange<Float>,
     styleName: String,
+    customColorEnabled: Boolean = false,
+    customColor: Color = Color.White,
     modifier: Modifier = Modifier
 ) {
     BoxWithConstraints(
@@ -2170,6 +2698,7 @@ fun CustomInteractiveSlider(
 
             when (styleName) {
                 "Estilo 1" -> {
+                    val styleColor = if (customColorEnabled) customColor else Color(0xFFFF5722)
                     drawLine(
                         color = Color.White.copy(alpha = 0.15f),
                         start = androidx.compose.ui.geometry.Offset(0f, centerY),
@@ -2178,7 +2707,7 @@ fun CustomInteractiveSlider(
                         cap = androidx.compose.ui.graphics.StrokeCap.Round
                     )
                     drawLine(
-                        color = Color(0xFFFF5722),
+                        color = styleColor,
                         start = androidx.compose.ui.geometry.Offset(0f, centerY),
                         end = androidx.compose.ui.geometry.Offset(activeWidth, centerY),
                         strokeWidth = 6.dp.toPx(),
@@ -2191,7 +2720,7 @@ fun CustomInteractiveSlider(
                     )
                 }
                 "Estilo 2" -> {
-                    val activeColor = Color(0xFF8A2BE2)
+                    val activeColor = if (customColorEnabled) customColor else Color(0xFF8A2BE2)
                     
                     // Inactive wave path (lower amplitude & transparency)
                     val path = androidx.compose.ui.graphics.Path()
@@ -2242,6 +2771,7 @@ fun CustomInteractiveSlider(
                     )
                 }
                 "Estilo 3" -> {
+                    val activeColor = if (customColorEnabled) customColor else Color(0xFF00FFCC)
                     drawLine(
                         color = Color.White.copy(alpha = 0.08f),
                         start = androidx.compose.ui.geometry.Offset(0f, centerY),
@@ -2250,7 +2780,7 @@ fun CustomInteractiveSlider(
                         cap = androidx.compose.ui.graphics.StrokeCap.Round
                     )
                     drawLine(
-                        color = Color(0xFF00FFCC),
+                        color = activeColor,
                         start = androidx.compose.ui.geometry.Offset(0f, centerY),
                         end = androidx.compose.ui.geometry.Offset(activeWidth, centerY),
                         strokeWidth = 8.dp.toPx(),
@@ -2265,7 +2795,7 @@ fun CustomInteractiveSlider(
                     )
                 }
                 "Estilo 4" -> {
-                    val activeColor = primaryColorStyle
+                    val activeColor = if (customColorEnabled) customColor else primaryColorStyle
                     
                     // Background continuous wave
                     val path = androidx.compose.ui.graphics.Path()
@@ -2301,6 +2831,7 @@ fun CustomInteractiveSlider(
                     )
                 }
                 "Barco de papel" -> {
+                    val activeColor = if (customColorEnabled) customColor else Color(0xFF00E5FF)
                     val path = androidx.compose.ui.graphics.Path()
                     path.moveTo(0f, centerY)
                     for (x in 0..width.toInt()) {
@@ -2321,7 +2852,7 @@ fun CustomInteractiveSlider(
                     }
                     drawPath(
                         path = activePath,
-                        color = Color(0xFF00E5FF),
+                        color = activeColor,
                         style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
                     )
 
@@ -2337,6 +2868,7 @@ fun CustomInteractiveSlider(
                     drawPath(path = boatPath, color = Color.White)
                 }
                 "Estilo 6 (Nave OVNI)" -> {
+                    val activeColor = if (customColorEnabled) customColor else Color(0xFFFF5722)
                     drawLine(
                         color = Color.White.copy(alpha = 0.15f),
                         start = androidx.compose.ui.geometry.Offset(0f, centerY),
@@ -2345,7 +2877,7 @@ fun CustomInteractiveSlider(
                         cap = androidx.compose.ui.graphics.StrokeCap.Round
                     )
                     drawLine(
-                        color = Color(0xFFFF5722),
+                        color = activeColor,
                         start = androidx.compose.ui.geometry.Offset(0f, centerY),
                         end = androidx.compose.ui.geometry.Offset(activeWidth, centerY),
                         strokeWidth = 6.dp.toPx(),
@@ -2362,7 +2894,7 @@ fun CustomInteractiveSlider(
                     beamPath.lineTo(ufoX + 12.dp.toPx(), centerY)
                     beamPath.lineTo(ufoX + 4.dp.toPx(), ufoY + 2.dp.toPx())
                     beamPath.close()
-                    drawPath(path = beamPath, color = Color(0xFF00FFCC).copy(alpha = 0.25f))
+                    drawPath(path = beamPath, color = activeColor.copy(alpha = 0.25f))
 
                     drawOval(
                         color = Color(0xFF78909C),
@@ -2375,7 +2907,7 @@ fun CustomInteractiveSlider(
                         size = androidx.compose.ui.geometry.Size(12.dp.toPx(), 6.dp.toPx())
                     )
                     drawCircle(
-                        color = Color(0xFF00FFCC),
+                        color = activeColor,
                         center = androidx.compose.ui.geometry.Offset(ufoX, ufoY + 1.dp.toPx()),
                         radius = 2.dp.toPx()
                     )

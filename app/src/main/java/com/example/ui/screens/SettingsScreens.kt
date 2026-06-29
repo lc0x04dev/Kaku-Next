@@ -4,7 +4,7 @@ import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -23,6 +23,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -41,6 +42,23 @@ import androidx.compose.ui.window.Dialog
 import androidx.navigation.NavController
 import com.example.ui.theme.*
 import com.example.viewmodel.MusicViewModel
+
+@Composable
+fun Modifier.scaleOnPress(interactionSource: MutableInteractionSource): Modifier {
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.85f else 1.0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "scale_on_press"
+    )
+    return this.graphicsLayer {
+        scaleX = scale
+        scaleY = scale
+    }
+}
 
 // Custom Squircle/Star shape that matches the "Por defecto" setting shape in Image 7 preview art!
 val SquircleStarShape: Shape = GenericShape { size, _ ->
@@ -1575,13 +1593,20 @@ fun CoverShapeScreen(
 
     val coverShape by viewModel.coverShape.collectAsState()
     val coverSize by viewModel.coverSize.collectAsState()
+    val coverDesign by viewModel.coverDesign.collectAsState()
+    val coverAnimation by viewModel.coverAnimation.collectAsState()
+    val coverColorMode by viewModel.coverColorMode.collectAsState()
+    val selectedCustomColor by viewModel.selectedCustomColor.collectAsState()
 
     val NeonCyan = MaterialTheme.colorScheme.primary
+    val NeonMagenta = Color(0xFFFF4081)
     val DeepDark = MaterialTheme.colorScheme.background
     val CardDark = MaterialTheme.colorScheme.primaryContainer
     val SurfaceDark = MaterialTheme.colorScheme.surface
     val bgThemeColor = MaterialTheme.colorScheme.background
     val cardColor = MaterialTheme.colorScheme.primaryContainer
+    
+    val customColor = Color(selectedCustomColor)
 
     val finalPercent = when (coverSize) {
         "70%" -> 0.7f
@@ -1593,6 +1618,65 @@ fun CoverShapeScreen(
         "Cuadrada" -> RoundedCornerShape(0.dp)
         "Circular" -> CircleShape
         else -> SquircleStarShape
+    }
+
+    // Dynamic cover colors computation
+    val coverDesignColors = when (coverColorMode) {
+        "Cian Eléctrico" -> listOf(Color(0xFF00E5FF), Color(0xFF00B0FF))
+        "Verde Neón" -> listOf(Color(0xFF39FF14), Color(0xFF00FF87))
+        "Magenta Vibrante" -> listOf(Color(0xFFE0115F), Color(0xFFFF4081))
+        "Personalizado" -> listOf(customColor, customColor.copy(alpha = 0.6f))
+        "RGB Animado (Arcoíris)" -> {
+            val transition = rememberInfiniteTransition(label = "rgb_cov_preview")
+            val animatedHue by transition.animateFloat(
+                initialValue = 0f,
+                targetValue = 360f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(6000, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "hue"
+            )
+            listOf(
+                Color.hsv(animatedHue, 0.85f, 1f),
+                Color.hsv((animatedHue + 120f) % 360f, 0.85f, 1f),
+                Color.hsv((animatedHue + 240f) % 360f, 0.85f, 1f)
+            )
+        }
+        else -> listOf(NeonCyan, Color(0xFFFF007F))
+    }
+
+    // Cover Animation setup for preview
+    val transition = rememberInfiniteTransition(label = "cover_preview_anim")
+    val rotationAngle by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(12000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "rotation"
+    )
+    
+    val pulseScale by transition.animateFloat(
+        initialValue = 0.95f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
+    )
+
+    val finalScale = when (coverAnimation) {
+        "Efecto Pulso (Beats)" -> pulseScale
+        "Escalar al Reproducir" -> 1.05f
+        else -> 1f
+    }
+    
+    val finalRotation = when (coverAnimation) {
+        "Rotación de Vinilo" -> rotationAngle
+        else -> 0f
     }
 
     Scaffold(
@@ -1625,110 +1709,165 @@ fun CoverShapeScreen(
         containerColor = bgThemeColor,
         modifier = modifier.fillMaxSize()
     ) { innerPadding ->
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .padding(horizontal = 20.dp),
+            contentPadding = PaddingValues(top = 12.dp, bottom = 48.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             
             // PREVIEW BOX
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = "Vista previa del reproductor",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextGray,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-                )
+            item {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "Vista previa del reproductor",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextGray,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                    )
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(cardColor)
-                        .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(24.dp))
-                        .padding(24.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(cardColor)
+                            .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(24.dp))
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        // Art preview
-                        Box(
-                            modifier = Modifier
-                                .size(160.dp * finalPercent)
-                                .clip(artworkShape)
-                                .background(
-                                    Brush.linearGradient(
-                                        colors = listOf(NeonCyan, NeonMagenta)
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            // Artwork Layout based on coverDesign
+                            Box(
+                                modifier = Modifier
+                                    .size(170.dp)
+                                    .graphicsLayer {
+                                        scaleX = finalScale
+                                        scaleY = finalScale
+                                        rotationZ = finalRotation
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (coverDesign == "Vinilo Retro") {
+                                    // Protruding Vinyl record background
+                                    Box(
+                                        modifier = Modifier
+                                            .size(150.dp)
+                                            .offset(x = 25.dp)
+                                            .clip(CircleShape)
+                                            .background(Color.Black)
+                                            .border(1.dp, Color.White.copy(alpha = 0.1f), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        // Vinyl grooves
+                                        Box(
+                                            modifier = Modifier
+                                                .size(110.dp)
+                                                .border(1.dp, Color.White.copy(alpha = 0.08f), CircleShape)
+                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .size(70.dp)
+                                                .border(1.dp, Color.White.copy(alpha = 0.08f), CircleShape)
+                                        )
+                                    }
+                                }
+
+                                // Main artwork frame
+                                Box(
+                                    modifier = Modifier
+                                        .size(150.dp * finalPercent)
+                                        .clip(artworkShape)
+                                        .background(Brush.linearGradient(colors = coverDesignColors))
+                                        .then(
+                                            if (coverDesign == "Borde Brillante (Neón)") {
+                                                Modifier.padding(4.dp)
+                                            } else {
+                                                Modifier.padding(1.dp)
+                                            }
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .clip(artworkShape)
+                                            .background(
+                                                if (coverDesign == "Tarjeta Minimalista") {
+                                                    cardColor.copy(alpha = 0.95f)
+                                                } else {
+                                                    cardColor.copy(alpha = 0.8f)
+                                                }
+                                            )
+                                            .then(
+                                                if (coverDesign == "Tarjeta Minimalista") {
+                                                    Modifier.border(2.dp, Color.White.copy(alpha = 0.1f), artworkShape)
+                                                } else {
+                                                    Modifier
+                                                }
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.MusicNote,
+                                            contentDescription = null,
+                                            tint = coverDesignColors.first(),
+                                            modifier = Modifier.size(56.dp * finalPercent)
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            // Below info card row
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color.White.copy(alpha = 0.02f))
+                                    .padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Starlight Sonata",
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
-                                )
-                                .padding(4.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .clip(artworkShape)
-                                    .background(cardColor.copy(alpha = 0.8f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.MusicNote,
-                                    contentDescription = null,
-                                    tint = NeonCyan,
-                                    modifier = Modifier.size(56.dp * finalPercent)
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // Below info card row
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(Color.White.copy(alpha = 0.02f))
-                                .padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Starlight Sonata",
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = "Lune MrDemonc",
-                                    color = TextGray,
-                                    fontSize = 11.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                            Box(
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.White)
-                                    .clickable { },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.PlayArrow,
-                                    contentDescription = "Play",
-                                    tint = DeepDark,
-                                    modifier = Modifier.size(18.dp)
-                                )
+                                    Text(
+                                        text = "Lune MrDemonc",
+                                        color = TextGray,
+                                        fontSize = 11.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(CircleShape)
+                                        .background(Color.White)
+                                    ,
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PlayArrow,
+                                        contentDescription = "Play",
+                                        tint = DeepDark,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -1736,56 +1875,104 @@ fun CoverShapeScreen(
             }
 
             // SHAPE SELECTION
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = "Forma de la carátula",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextGray,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    val shapes = listOf(
-                        ShapeOption("Por defecto", SquircleStarShape),
-                        ShapeOption("Cuadrada", RoundedCornerShape(10.dp)),
-                        ShapeOption("Circular", CircleShape)
+            item {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "Forma de la carátula",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextGray,
+                        modifier = Modifier.padding(bottom = 8.dp)
                     )
 
-                    shapes.forEach { option ->
-                        val selected = coverShape == option.name
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(if (selected) NeonCyan.copy(alpha = 0.1f) else cardColor)
-                                .border(
-                                    width = 1.dp,
-                                    color = if (selected) NeonCyan else Color.White.copy(alpha = 0.05f),
-                                    shape = RoundedCornerShape(16.dp)
-                                )
-                                .clickable {
-                                    if (opticalVibration) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    viewModel.setCoverShape(option.name)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val shapes = listOf(
+                            ShapeOption("Por defecto", SquircleStarShape),
+                            ShapeOption("Cuadrada", RoundedCornerShape(10.dp)),
+                            ShapeOption("Circular", CircleShape)
+                        )
+
+                        shapes.forEach { option ->
+                            val selected = coverShape == option.name
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(if (selected) coverDesignColors.first().copy(alpha = 0.1f) else cardColor)
+                                    .border(
+                                        width = 1.dp,
+                                        color = if (selected) coverDesignColors.first() else Color.White.copy(alpha = 0.05f),
+                                        shape = RoundedCornerShape(16.dp)
+                                    )
+                                    .clickable {
+                                        if (opticalVibration) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        viewModel.setCoverShape(option.name)
+                                    }
+                                    .padding(12.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(option.shape)
+                                            .background(if (selected) coverDesignColors.first() else TextGray)
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = option.name,
+                                        color = if (selected) coverDesignColors.first() else Color.White,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
-                                .padding(12.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .clip(option.shape)
-                                        .background(if (selected) NeonCyan else TextGray)
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+                        }
+                    }
+                }
+            }
+
+            // SIZE SELECTION
+            item {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "Tamaño de la carátula",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextGray,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(cardColor)
+                            .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
+                            .padding(4.dp)
+                    ) {
+                        val sizes = listOf("70%", "85%", "100%")
+                        sizes.forEach { sizeOption ->
+                            val selected = coverSize == sizeOption
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(if (selected) Color.White else Color.Transparent)
+                                    .clickable {
+                                        if (opticalVibration) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        viewModel.setCoverSize(sizeOption)
+                                    }
+                                    .padding(vertical = 12.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
                                 Text(
-                                    text = option.name,
-                                    color = if (selected) NeonCyan else Color.White,
-                                    fontSize = 12.sp,
+                                    text = sizeOption,
+                                    color = if (selected) DeepDark else Color.White,
+                                    fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
@@ -1794,45 +1981,213 @@ fun CoverShapeScreen(
                 }
             }
 
-            // SIZE SELECTION
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = "Tamaño de la carátula",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextGray,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
+            // NEW: COVER DESIGNS SELECTION
+            item {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "Diseño de la carátula",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextGray,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(cardColor)
-                        .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
-                        .padding(4.dp)
-                ) {
-                    val sizes = listOf("70%", "85%", "100%")
-                    sizes.forEach { sizeOption ->
-                        val selected = coverSize == sizeOption
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (selected) Color.White else Color.Transparent)
-                                .clickable {
-                                    if (opticalVibration) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    viewModel.setCoverSize(sizeOption)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(cardColor)
+                            .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
+                    ) {
+                        val designs = listOf(
+                            "Estándar" to "Marco clásico de alta definición",
+                            "Borde Brillante (Neón)" to "Aura brillante que resalta en bordes",
+                            "Vinilo Retro" to "Disco de vinilo saliendo del empaque",
+                            "Tarjeta Minimalista" to "Diseño limpio con bordes finos plateados"
+                        )
+
+                        designs.forEachIndexed { idx, (designName, designDesc) ->
+                            val selected = coverDesign == designName
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        if (opticalVibration) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        viewModel.setCoverDesign(designName)
+                                    }
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = designName,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (selected) coverDesignColors.first() else Color.White
+                                    )
+                                    Text(
+                                        text = designDesc,
+                                        fontSize = 11.sp,
+                                        color = TextGray
+                                    )
                                 }
-                                .padding(vertical = 12.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = sizeOption,
-                                color = if (selected) DeepDark else Color.White,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                                RadioButton(
+                                    selected = selected,
+                                    onClick = {
+                                        if (opticalVibration) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        viewModel.setCoverDesign(designName)
+                                    },
+                                    colors = RadioButtonDefaults.colors(
+                                        selectedColor = coverDesignColors.first(),
+                                        unselectedColor = TextGray
+                                    )
+                                )
+                            }
+                            if (idx < designs.size - 1) {
+                                HorizontalDivider(color = Color.White.copy(alpha = 0.05f))
+                            }
+                        }
+                    }
+                }
+            }
+
+            // NEW: COVER ANIMATIONS SELECTION
+            item {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "Animación al reproducir",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextGray,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(cardColor)
+                            .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
+                    ) {
+                        val animations = listOf(
+                            "Ninguna" to "Estática sin movimiento",
+                            "Rotación de Vinilo" to "Gira continuamente como un tocadiscos",
+                            "Efecto Pulso (Beats)" to "Crece y se encoge rítmicamente",
+                            "Escalar al Reproducir" to "Se expande suavemente al dar Play"
+                        )
+
+                        animations.forEachIndexed { idx, (animName, animDesc) ->
+                            val selected = coverAnimation == animName
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        if (opticalVibration) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        viewModel.setCoverAnimation(animName)
+                                    }
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = animName,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (selected) coverDesignColors.first() else Color.White
+                                    )
+                                    Text(
+                                        text = animDesc,
+                                        fontSize = 11.sp,
+                                        color = TextGray
+                                    )
+                                }
+                                RadioButton(
+                                    selected = selected,
+                                    onClick = {
+                                        if (opticalVibration) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        viewModel.setCoverAnimation(animName)
+                                    },
+                                    colors = RadioButtonDefaults.colors(
+                                        selectedColor = coverDesignColors.first(),
+                                        unselectedColor = TextGray
+                                    )
+                                )
+                            }
+                            if (idx < animations.size - 1) {
+                                HorizontalDivider(color = Color.White.copy(alpha = 0.05f))
+                            }
+                        }
+                    }
+                }
+            }
+
+            // NEW: COVER COLOR CUSTOMIZATION
+            item {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "Gama de colores de la carátula",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextGray,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(cardColor)
+                            .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
+                    ) {
+                        val colorOptions = listOf(
+                            "Por defecto (Gradiente)" to "Cian y Magenta integrados de fábrica",
+                            "Cian Eléctrico" to "Color cian sólido de alta energía",
+                            "Verde Neón" to "Verde fluorescente refrescante",
+                            "Magenta Vibrante" to "Magenta profundo estético",
+                            "RGB Animado (Arcoíris)" to "Transición infinita de colores RGB",
+                            "Personalizado" to "Usa el color de tu tema de personalización"
+                        )
+
+                        colorOptions.forEachIndexed { idx, (colorName, colorDesc) ->
+                            val selected = coverColorMode == colorName
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        if (opticalVibration) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        viewModel.setCoverColorMode(colorName)
+                                    }
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = colorName,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (selected) NeonCyan else Color.White
+                                    )
+                                    Text(
+                                        text = colorDesc,
+                                        fontSize = 11.sp,
+                                        color = TextGray
+                                    )
+                                }
+                                RadioButton(
+                                    selected = selected,
+                                    onClick = {
+                                        if (opticalVibration) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        viewModel.setCoverColorMode(colorName)
+                                    },
+                                    colors = RadioButtonDefaults.colors(
+                                        selectedColor = NeonCyan,
+                                        unselectedColor = TextGray
+                                    )
+                                )
+                            }
+                            if (idx < colorOptions.size - 1) {
+                                HorizontalDivider(color = Color.White.copy(alpha = 0.05f))
+                            }
                         }
                     }
                 }
@@ -1898,7 +2253,8 @@ fun PlayerControlStyleScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(horizontal = 20.dp),
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             
@@ -1922,15 +2278,35 @@ fun PlayerControlStyleScreen(
                         .padding(24.dp),
                     contentAlignment = Alignment.Center
                 ) {
+                    // Interaction sources for simulation click scaling animation
+                    val prevInteraction = remember { MutableInteractionSource() }
+                    val playInteraction = remember { MutableInteractionSource() }
+                    val nextInteraction = remember { MutableInteractionSource() }
+
                     // Playback Controls Row simulation
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(24.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = if (buttonStyle == "Play 5") {
+                            Modifier
+                                .clip(RoundedCornerShape(32.dp))
+                                .background(Color.White.copy(alpha = 0.04f))
+                                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(32.dp))
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                        } else {
+                            Modifier
+                        }
                     ) {
                         // PREV BUTTON
-                        IconButton(onClick = {}, modifier = Modifier.size(48.dp)) {
+                        IconButton(
+                            onClick = { if (opticalVibration) haptic.performHapticFeedback(HapticFeedbackType.LongPress) },
+                            interactionSource = prevInteraction,
+                            modifier = Modifier
+                                .size(48.dp)
+                                .scaleOnPress(prevInteraction)
+                        ) {
                             Icon(
-                                imageVector = if (filledIcons) Icons.Default.SkipPrevious else Icons.Default.SkipPrevious,
+                                imageVector = Icons.Default.SkipPrevious,
                                 contentDescription = null,
                                 tint = if (customControlsColor) NeonCyan else Color.White,
                                 modifier = Modifier.size(28.dp)
@@ -1944,6 +2320,13 @@ fun PlayerControlStyleScreen(
                                 Box(
                                     modifier = Modifier
                                         .size(64.dp)
+                                        .scaleOnPress(playInteraction)
+                                        .clickable(
+                                            interactionSource = playInteraction,
+                                            indication = null
+                                        ) {
+                                            if (opticalVibration) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        }
                                         .clip(RoundedCornerShape(16.dp))
                                         .background(if (customControlsColor) NeonCyan else Color.White),
                                     contentAlignment = Alignment.Center
@@ -1960,6 +2343,13 @@ fun PlayerControlStyleScreen(
                                 Box(
                                     modifier = Modifier
                                         .size(64.dp)
+                                        .scaleOnPress(playInteraction)
+                                        .clickable(
+                                            interactionSource = playInteraction,
+                                            indication = null
+                                        ) {
+                                            if (opticalVibration) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        }
                                         .border(2.dp, if (customControlsColor) NeonCyan else Color.White, CircleShape),
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -1971,11 +2361,115 @@ fun PlayerControlStyleScreen(
                                     )
                                 }
                             }
+                            "Play 4" -> {
+                                // Squircle/Star design
+                                Box(
+                                    modifier = Modifier
+                                        .size(64.dp)
+                                        .scaleOnPress(playInteraction)
+                                        .clickable(
+                                            interactionSource = playInteraction,
+                                            indication = null
+                                        ) {
+                                            if (opticalVibration) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        }
+                                        .clip(SquircleStarShape)
+                                        .background(if (customControlsColor) NeonCyan else Color.White),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = playIcon,
+                                        contentDescription = null,
+                                        tint = DeepDark,
+                                        modifier = Modifier.size(36.dp)
+                                    )
+                                }
+                            }
+                            "Play 5" -> {
+                                // Capsule integrated mini style
+                                Box(
+                                    modifier = Modifier
+                                        .size(56.dp)
+                                        .scaleOnPress(playInteraction)
+                                        .clickable(
+                                            interactionSource = playInteraction,
+                                            indication = null
+                                        ) {
+                                            if (opticalVibration) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        }
+                                        .clip(CircleShape)
+                                        .background(
+                                            Brush.linearGradient(
+                                                colors = listOf(
+                                                    if (customControlsColor) NeonCyan else Color(0xFF00E5FF),
+                                                    if (customControlsColor) NeonCyan.copy(alpha = 0.6f) else Color(0xFF00B0FF)
+                                                )
+                                            )
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = playIcon,
+                                        contentDescription = null,
+                                        tint = DeepDark,
+                                        modifier = Modifier.size(32.dp)
+                                    )
+                                }
+                            }
+                            "Play 6" -> {
+                                // Glow outline
+                                val infiniteTransition = rememberInfiniteTransition(label = "glow_btn")
+                                val animatedGlowRadius by infiniteTransition.animateFloat(
+                                    initialValue = 0f,
+                                    targetValue = 6f,
+                                    animationSpec = infiniteRepeatable(
+                                        animation = tween(1500, easing = EaseInOutSine),
+                                        repeatMode = RepeatMode.Reverse
+                                    ),
+                                    label = "glow"
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(64.dp)
+                                        .scaleOnPress(playInteraction)
+                                        .clickable(
+                                            interactionSource = playInteraction,
+                                            indication = null
+                                        ) {
+                                            if (opticalVibration) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        }
+                                        .border(
+                                            width = 1.dp + animatedGlowRadius.dp / 3,
+                                            color = (if (customControlsColor) NeonCyan else Color(0xFFFF007F)).copy(
+                                                alpha = 0.5f + (6f - animatedGlowRadius) / 12f
+                                            ),
+                                            shape = CircleShape
+                                        )
+                                        .padding(4.dp)
+                                        .clip(CircleShape)
+                                        .background(if (customControlsColor) NeonCyan else Color.White),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = playIcon,
+                                        contentDescription = null,
+                                        tint = DeepDark,
+                                        modifier = Modifier.size(32.dp)
+                                    )
+                                }
+                            }
                             else -> {
                                 // Default circular filled
                                 Box(
                                     modifier = Modifier
                                         .size(64.dp)
+                                        .scaleOnPress(playInteraction)
+                                        .clickable(
+                                            interactionSource = playInteraction,
+                                            indication = null
+                                        ) {
+                                            if (opticalVibration) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        }
                                         .clip(CircleShape)
                                         .background(if (customControlsColor) NeonCyan else Color.White),
                                     contentAlignment = Alignment.Center
@@ -1991,9 +2485,15 @@ fun PlayerControlStyleScreen(
                         }
 
                         // NEXT BUTTON
-                        IconButton(onClick = {}, modifier = Modifier.size(48.dp)) {
+                        IconButton(
+                            onClick = { if (opticalVibration) haptic.performHapticFeedback(HapticFeedbackType.LongPress) },
+                            interactionSource = nextInteraction,
+                            modifier = Modifier
+                                .size(48.dp)
+                                .scaleOnPress(nextInteraction)
+                        ) {
                             Icon(
-                                imageVector = if (filledIcons) Icons.Default.SkipNext else Icons.Default.SkipNext,
+                                imageVector = Icons.Default.SkipNext,
                                 contentDescription = null,
                                 tint = if (customControlsColor) NeonCyan else Color.White,
                                 modifier = Modifier.size(28.dp)
@@ -2013,36 +2513,61 @@ fun PlayerControlStyleScreen(
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(cardColor)
+                        .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
                 ) {
-                    val styles = listOf("Por defecto", "Play 2", "Play 3")
-                    styles.forEach { styleOption ->
+                    val styles = listOf(
+                        "Por defecto" to "Círculo relleno clásico de alta visibilidad",
+                        "Play 2" to "Cuadrado redondeado elegante",
+                        "Play 3" to "Círculo minimalista con borde transparente",
+                        "Play 4" to "Forma geométrica de estrella/esquírculo futurista",
+                        "Play 5" to "Diseño de barra de cápsula integrada de neón",
+                        "Play 6" to "Glow de neón respirante con halo flotante"
+                    )
+
+                    styles.forEachIndexed { idx, (styleOption, styleDesc) ->
                         val selected = buttonStyle == styleOption
-                        Box(
+                        Row(
                             modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(if (selected) NeonCyan.copy(alpha = 0.1f) else cardColor)
-                                .border(
-                                    width = 1.dp,
-                                    color = if (selected) NeonCyan else Color.White.copy(alpha = 0.05f),
-                                    shape = RoundedCornerShape(16.dp)
-                                )
+                                .fillMaxWidth()
                                 .clickable {
                                     if (opticalVibration) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     viewModel.setButtonStyle(styleOption)
                                 }
-                                .padding(vertical = 16.dp),
-                            contentAlignment = Alignment.Center
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = styleOption,
-                                color = if (selected) NeonCyan else Color.White,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = styleOption,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (selected) NeonCyan else Color.White
+                                )
+                                Text(
+                                    text = styleDesc,
+                                    fontSize = 11.sp,
+                                    color = TextGray
+                                )
+                            }
+                            RadioButton(
+                                selected = selected,
+                                onClick = {
+                                    if (opticalVibration) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    viewModel.setButtonStyle(styleOption)
+                                },
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = NeonCyan,
+                                    unselectedColor = TextGray
+                                )
                             )
+                        }
+                        if (idx < styles.size - 1) {
+                            HorizontalDivider(color = Color.White.copy(alpha = 0.05f))
                         }
                     }
                 }
@@ -2164,6 +2689,8 @@ fun ProgressBarStyleScreen(
     val isAmoled by viewModel.amoledScreen.collectAsState()
     val opticalVibration by viewModel.opticalVibration.collectAsState()
     val progressBarStyle by viewModel.progressBarStyle.collectAsState()
+    val progressBarCustomColorEnabled by viewModel.progressBarCustomColorEnabled.collectAsState()
+    val progressBarCustomColor by viewModel.progressBarCustomColor.collectAsState()
 
     val bgThemeColor = MaterialTheme.colorScheme.background
     val cardColor = MaterialTheme.colorScheme.primaryContainer
@@ -2217,6 +2744,90 @@ fun ProgressBarStyleScreen(
             contentPadding = PaddingValues(top = 12.dp, bottom = 48.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(cardColor)
+                        .padding(16.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Personalizar Color",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                                Text(
+                                    text = "Si está desactivado se usará el color blanco por defecto",
+                                    fontSize = 11.sp,
+                                    color = TextGray
+                                )
+                            }
+                            Switch(
+                                checked = progressBarCustomColorEnabled,
+                                onCheckedChange = { checked ->
+                                    if (opticalVibration) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    viewModel.setProgressBarCustomColorEnabled(checked)
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = NeonCyan,
+                                    checkedTrackColor = NeonCyan.copy(alpha = 0.3f)
+                                )
+                            )
+                        }
+                        
+                        if (progressBarCustomColorEnabled) {
+                            Text(
+                                text = "Elige un color para tu barra de progreso:",
+                                fontSize = 12.sp,
+                                color = Color.White.copy(alpha = 0.7f)
+                            )
+                            val paletteColors = listOf(
+                                Color(0xFF00FFCC), // Neon Turquoise
+                                Color(0xFFFF007F), // Neon Pink
+                                Color(0xFFFFCC00), // Vibrant Amber
+                                Color(0xFF9D4EDD), // Deep Violet
+                                Color(0xFFFF5722), // Deep Orange
+                                Color(0xFF00E5FF), // Cyan Accent
+                                Color(0xFF2ECC71), // Smooth Green
+                                Color(0xFFE74C3C)  // Smooth Red
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                paletteColors.forEach { color ->
+                                    val isSelected = progressBarCustomColor == color.toArgb().toLong()
+                                    Box(
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .clip(CircleShape)
+                                            .background(color)
+                                            .border(
+                                                width = if (isSelected) 3.dp else 0.dp,
+                                                color = Color.White,
+                                                shape = CircleShape
+                                            )
+                                            .clickable {
+                                                if (opticalVibration) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                viewModel.setProgressBarCustomColor(color.toArgb().toLong())
+                                            }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             items(styles) { (styleName, styleDesc) ->
                 val isSelected = progressBarStyle == styleName
                 Box(
@@ -2737,6 +3348,118 @@ fun PlayerBackgroundStyleScreen(
                                 )
                             }
                         }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        PresetBackgroundCard(
+                            name = "Místico Aleatorio",
+                            modifier = Modifier.weight(1f),
+                            selectedPreset = playerBackgroundPreset,
+                            onClick = {
+                                if (opticalVibration) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                viewModel.setPlayerBackgroundPreset("Místico Aleatorio")
+                                viewModel.setPlayerBackgroundStyle("Static Colors")
+                            }
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(
+                                        Brush.verticalGradient(
+                                            listOf(
+                                                Color(0xFF8E2DE2),
+                                                Color(0xFF4A00E0)
+                                            )
+                                        )
+                                    )
+                            ) {
+                                Text(
+                                    text = "✦",
+                                    color = Color.White.copy(alpha = 0.3f),
+                                    fontSize = 40.sp,
+                                    modifier = Modifier.align(Alignment.Center)
+                                )
+                            }
+                        }
+
+                        PresetBackgroundCard(
+                            name = "Nebulosa Cósmica",
+                            modifier = Modifier.weight(1f),
+                            selectedPreset = playerBackgroundPreset,
+                            onClick = {
+                                if (opticalVibration) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                viewModel.setPlayerBackgroundPreset("Nebulosa Cósmica")
+                                viewModel.setPlayerBackgroundStyle("Static Colors")
+                            }
+                        ) {
+                            Canvas(modifier = Modifier.fillMaxSize()) {
+                                drawRect(color = Color(0xFF03001e))
+                                drawCircle(
+                                    color = Color(0xFFec38bc).copy(alpha = 0.4f),
+                                    center = androidx.compose.ui.geometry.Offset(size.width * 0.3f, size.height * 0.4f),
+                                    radius = size.width * 0.6f
+                                )
+                                drawCircle(
+                                    color = Color(0xFF7303c0).copy(alpha = 0.3f),
+                                    center = androidx.compose.ui.geometry.Offset(size.width * 0.7f, size.height * 0.6f),
+                                    radius = size.width * 0.5f
+                                )
+                                drawCircle(
+                                    color = Color(0xFF03001e).copy(alpha = 0.8f),
+                                    center = androidx.compose.ui.geometry.Offset(size.width * 0.5f, size.height * 0.5f),
+                                    radius = 20f
+                                )
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        PresetBackgroundCard(
+                            name = "Cyberpunk Retro",
+                            modifier = Modifier.weight(1f),
+                            selectedPreset = playerBackgroundPreset,
+                            onClick = {
+                                if (opticalVibration) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                viewModel.setPlayerBackgroundPreset("Cyberpunk Retro")
+                                viewModel.setPlayerBackgroundStyle("Static Colors")
+                            }
+                        ) {
+                            Canvas(modifier = Modifier.fillMaxSize()) {
+                                drawRect(color = Color(0xFF0D0D11))
+                                // Draw synthwave grid line
+                                drawCircle(
+                                    color = Color(0xFFFF007F).copy(alpha = 0.15f),
+                                    center = androidx.compose.ui.geometry.Offset(size.width * 0.5f, size.height * 0.45f),
+                                    radius = size.width * 0.4f
+                                )
+                                // Draw retro horizon lines
+                                val horizonY = size.height * 0.65f
+                                drawLine(
+                                    color = Color(0xFF00FFCC).copy(alpha = 0.5f),
+                                    start = androidx.compose.ui.geometry.Offset(0f, horizonY),
+                                    end = androidx.compose.ui.geometry.Offset(size.width, horizonY),
+                                    strokeWidth = 2f
+                                )
+                                for (i in 1..4) {
+                                    val y = horizonY + i * (size.height - horizonY) / 5
+                                    drawLine(
+                                        color = Color(0xFF00FFCC).copy(alpha = 0.15f * (i.toFloat() / 4f)),
+                                        start = androidx.compose.ui.geometry.Offset(0f, y),
+                                        end = androidx.compose.ui.geometry.Offset(size.width, y),
+                                        strokeWidth = 1f
+                                    )
+                                }
+                            }
+                        }
+
+                        // Spacer placeholder box to maintain beautiful 2-column alignment
+                        Box(modifier = Modifier.weight(1f))
                     }
                 }
             }
